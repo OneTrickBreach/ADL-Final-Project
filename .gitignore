@@ -16,6 +16,15 @@ htmlcov/
 .idea/
 
 # Data and Results
-results/
-*.log
 data/
+!data/raw/
+!data/raw/.gitkeep
+!data/processed/
+!data/processed/.gitkeep
+results/
+!results/
+!results/.gitkeep
+models/
+!models/
+!models/.gitkeep
+*.log

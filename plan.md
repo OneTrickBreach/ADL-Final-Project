@@ -1,42 +1,32 @@
-# Project Plan: Multi-Agent Tactical Divergence in KAZ
+### **Final Project Plan (Execute Solo in WSL: Ubuntu)**
 
-## Phase 0: Project Initialization & Git Setup
-- [ ] Ensure IDE is connected to `WSL: Ubuntu` and opened in `~/adl_final_kaz`.
-- [ ] Initialize Git repository: `git init`.
-- [ ] Create a `.gitignore` to exclude `.venv/`, `results/`, and `__pycache__/`.
-- [ ] Link to GitHub: `git remote add origin <your-repo-url>`.
-- [ ] Perform first commit: `git add. && git commit -m "Initial structure"`.
+#### **Phase 1: High-Performance Stack (RTX 5070 Ti Optimization)**
+*   [ ] Create a native Linux virtual environment: `python3 -m venv.venv`.
+*   [ ] Activate and install **Torch with CUDA 12.4** (essential for the 5070 Ti):
+    `./venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124`.
+*   [ ] Install the MARL stack: `./venv/bin/pip install 'pettingzoo[butterfly]' supersuit 'ray[rllib]' tensorboard opencv-python`.
+*   [ ] **GPU Handshake:** Run a script to verify `torch.cuda.is_available()` returns `True` and identifies the 5070 Ti.
 
-## Phase 1: High-Performance Environment Setup
-- [ ] Create virtual environment: `python3 -m venv.venv`.
-- [ ] Activate environment and install **Torch with CUDA 12.4 support** (Optimized for 5070 Ti):
-  - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124`
-- [ ] Install MARL stack:
-  - `pip install 'pettingzoo[butterfly]' supersuit 'ray[rllib]' tensorboard`
-- [ ] Verify GPU visibility: `python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()} - Device: {torch.cuda.get_device_name(0)}')"`
+#### **Phase 2: Game 1 - The Villain (Standard Role-Failure)**
+*   [ ] **Environment Setup:** Implement `src/env_villain.py` with standard `knights_archers_zombies_v10`. Use `vector_state=False` for full visual parity .
+*   [ ] **Training:** Use **Independent PPO (IPPO)** but with a **Shared Policy**. This forces role-confusion, showcasing how the Knight "forgets" to defend the Archer .
+*   [ ] **Data Capture:** Save TensorBoard logs showing high "Average Reward" but frequent "Border Breaches" and "Teammate Death" events.
+*   [ ] **Visual Proof:** Generate a GIF of a Knight charging into a swarm while the Archer is killed from behind.[3]
 
-## Phase 2: Baseline "Selfish" Agent Logic
-- [ ] Implement `src/env_setup.py`:
-  - Initialize `knights_archers_zombies_v10`.
-  - Apply SuperSuit wrappers: `color_reduction_v0`, `resize_v1` (84x84), `frame_stack_v1` (3), and `black_death_v3`.
-- [ ] Implement `src/train.py`:
-  - Set up a standard PPO configuration using RLlib's Multi-Agent API.
-  - Run a 100-iteration baseline training session.
-  - Store results in `results/baseline/`.
+#### **Phase 3: Game 2 - The Hero (Solving the "Impossible" Constraint)**
+*   [ ] **The "Impossible" Wrapper:** Create `src/env_hero.py` with a custom logic layer:
+    *   **Resource Scarcity:** Archer starts with only 20 arrows. Knight swings cost -0.2 reward (Stamina penalty) .
+    *   **Perceptual Smoke:** Add Gaussian Noise to observations. Agents must learn to "wait for clarity" to avoid wasting arrows .
+*   [ ] **The Machinery (Divergent Rewards):**
+    *   **Knight:** +1.0 kill, -10.0 if Archer dies (High Preservation Bias) .
+    *   **Archer:** +1.0 kill, -20.0 if Border breached (Mission Integrity).
+*   [ ] **Training:** Implement a **Pareto Sweep** over the "Stamina Penalty" weight to find the point where agents become "Cautious Experts" .
 
-## Phase 3: The "Novelty" Layer - Tactical Divergence
-- [ ] Create a custom Reward Wrapper in `src/env_setup.py` to decompose signals:
-  - **Knight Reward:** $+1$ for kills, $-0.5$ if Archer dies (Preservation bias).
-  - **Archer Reward:** $+1$ for kills, $-2.0$ if Zombies reach the border (Border integrity bias).
-- [ ] Update `src/train.py` to use these divergent rewards.
-- [ ] Implement a **Hyperparameter Sweep** over the "Preservation weight" to find the Pareto Front.
+#### **Phase 4: Interpretability & "The Story" (The 96+ Grade Layer)**
+*   [ ] **Saliency Maps:** Implement `src/interpret.py` using **LRP (Layer-wise Relevance Propagation)** or **Saliency Maps** to show which zombies the Archer is "watching" versus the Knight .
+*   [ ] **The Margin Narrative:** Calculate a "Profit Metric." Arrows/Stamina = Business Cost. Surviving = Business Revenue. 
+*   [ ] **Success Metric:** Prove the Hero model achieves a **lower "Cost-per-Kill"** and higher "Team Profit" than the Villain, satisfying Steve’s demand for business grounding.[3]
 
-## Phase 4: Qualitative Evaluation & "The Story"
-- [ ] Implement `src/visualize.py`:
-  - Generate 30-second GIFs of the trained agents.
-  - Highlight "Covering Fire" behaviors (where Archer protects a reloading Knight).
-- [ ] Export TensorBoard logs to analyze the "Selfish Collapse" vs. "Tactical Coordination" curves.
-
-## Phase 5: Final Submission Readiness
-- [ ] Finalize `README.md` with instructions on how to reproduce the training.
-- [ ] Push all code to GitHub: `git push origin main`.
+#### **Phase 5: Submit & Deploy**
+*   [ ] Perform a **Stress Test**: Increase zombie spawn rate by 50% and document how the Hero's "Fire Discipline" allows them to survive longer than the Villain .
+*   [ ] Finalize `README.md` and push all code/checkpoints to GitHub.

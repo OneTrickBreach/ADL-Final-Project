@@ -8,3 +8,5 @@
 6. **No Data Loss:** Never delete the `results/` or `ray_results/` folders without explicit confirmation, as these contain hours of training progress.
 7. **Progress Tracking:** Always check the plan.md file before starting a new task to ensure you are following the correct sequence.
 8. **Error Handling:** If a command fails, check the error message and try to fix it. If you are unable to fix it, ask for help.
+9. **Interpretability Required:** Every training loop MUST include a `SummaryWriter` for TensorBoard. Do not perform any training run without logging "Reward Decomposition" (Aggression vs. Preservation).
+

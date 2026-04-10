@@ -1,0 +1,22 @@
+# Core ML framework (CUDA 12.8 build for RTX 5070 Ti)
+--index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+
+# Multi-agent environment
+pettingzoo[butterfly]==1.25.0
+gymnasium==1.2.2
+supersuit==3.10.0
+
+# Numerical computing
+numpy==2.4.3
+
+# Logging & visualization
+tensorboard==2.20.0
+matplotlib==3.10.8
+
+# Computer vision (Gaussian fog wrapper)
+opencv-python==4.13.0.92
+
+# Distributed RL (Ray RLlib)
+ray[rllib]==2.54.1

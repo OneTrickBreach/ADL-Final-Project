@@ -53,7 +53,7 @@ ADLProject2/
 
 ### Phase 3: The Altruistic Hero (Game 4)
 * **Game 4 (+ 60/40 Comrade Healthcare):**
-    * **Logic:** Reward for Agent $i = (0.6 \times \text{Self\_Reward}) + (0.4 \times \text{Teammate\_Reward})$.
+    * **Logic:** Reward for Agent $i$: $R_i = (0.6 \times R_{\text{self}}) + (0.4 \times R_{\text{team}})$.
     * **Behavioral Shift:** The Knight becomes a **Guardian**. If the Archer is approached by a zombie, the Knight’s 40% stake in the Archer's health outweighs the stamina cost to travel and save them.
     * **Goal:** Explicit coordination and perimeter defense.
 

@@ -1,33 +1,82 @@
-### **Final Project Plan (Execute Solo in WSL: Ubuntu)**
+## 🛡️ Project: The Evolution of Fire Discipline (5-Game Ablation)
 
-#### **Phase 1: High-Performance Stack (RTX 5070 Ti Optimization)**
-*   [ ] Create a native Linux virtual environment: `python3 -m venv.venv`.
-*   [ ] Activate and install **Torch with CUDA 12.4** (essential for the 5070 Ti):
-    `./venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124`.
-*   [ ] Install the MARL stack: `./venv/bin/pip install 'pettingzoo[butterfly]' supersuit 'ray[rllib]' tensorboard opencv-python`.
-*   [ ] **GPU Handshake:** Run a script to verify `torch.cuda.is_available()` returns `True` and identifies the 5070 Ti.
+### Core Model Architecture
+* **Type:** Multi-Agent PPO (MAPPO) with Shared-Parameter Backbone.
+* **Modification:** Multi-Objective Reward Heads with a **60/40 Weighting** for teammate health.
+* **Hardware:** RTX 5070 Ti (optimized via `torch.cuda`).
 
-#### **Phase 2: Game 1 - The Villain (Standard Role-Failure)**
-*   [ ] **Environment Setup:** Implement `src/env_villain.py` with standard `knights_archers_zombies_v10`. Use `vector_state=False` for full visual parity .
-*   [ ] **Training:** Use **Independent PPO (IPPO)** but with a **Shared Policy**. This forces role-confusion, showcasing how the Knight "forgets" to defend the Archer .
-*   [ ] **Data Capture:** Save TensorBoard logs to `results/villain/` showing high "Average Reward" but frequent "Border Breaches" and "Teammate Death" events.
-*   [ ] **Visual Proof:** Generate a GIF to `results/villain/` of a Knight charging into a swarm while the Archer is killed from behind.
+---
 
-#### **Phase 3: Game 2 - The Hero (Solving the "Impossible" Constraint)**
-*   [ ] **The "Impossible" Wrapper:** Create `src/env_hero.py` with a custom logic layer:
-    *   **Resource Scarcity:** Archer starts with only 20 arrows. Knight swings cost -0.2 reward (Stamina penalty) .
-    *   **Perceptual Smoke:** Add Gaussian Noise to observations. Agents must learn to "wait for clarity" to avoid wasting arrows .
-*   [ ] **The Machinery (Divergent Rewards):**
-    *   **Knight:** +1.0 kill, -10.0 if Archer dies (High Preservation Bias) .
-    *   **Archer:** +1.0 kill, -20.0 if Border breached (Mission Integrity).
-*   [ ] **Training:** Implement a **Pareto Sweep** over the "Stamina Penalty" weight to find the point where agents become "Cautious Experts". Save checkpoints to `models/hero/`.
+### Project Directory Layout
+```
+ADLProject2/
+├── src/                        # All source code (wrappers, models, training loops)
+│   ├── wrappers/               # KAZWrapper and game-level modifier classes
+│   ├── models/                 # MAPPO network definitions and reward heads
+│   └── train.py                # Main training entry point
+├── notebooks/                  # Exploratory analysis and saliency map prototyping
+├── data/
+│   ├── raw/                    # Unprocessed environment recordings / replays
+│   └── processed/              # Preprocessed observations for offline analysis
+├── models/                     # Saved checkpoints per Game level (G1–G5)
+├── results/                    # Output plots, ablation tables, metrics, logs
+│   └── tensorboard/            # SummaryWriter logs (Reward Decomposition per run)
+├── docs/                       # Documentation and writeup assets
+├── plan.md                     # This file — check before every task
+├── rules.md                    # Execution rules for this project
+└── venv/                       # Project-scoped virtual environment
+```
 
-#### **Phase 4: Interpretability & "The Story" (The 96+ Grade Layer)**
-*   [ ] **Saliency Maps:** Implement `src/interpret.py` using **LRP (Layer-wise Relevance Propagation)** or **Saliency Maps** to show which zombies the Archer is "watching" versus the Knight. Save visualizations to `results/interpretability/`.
-*   [ ] **The Margin Narrative:** Calculate a "Profit Metric." Arrows/Stamina = Business Cost. Surviving = Business Revenue. Document findings in `docs/`.
-*   [ ] **Success Metric:** Prove the Hero model achieves a **lower "Cost-per-Kill"** and higher "Team Profit" than the Villain, satisfying Steve's demand for business grounding.
+**Artifact mapping by phase:**
+* **Phase 1–4 training scripts** → `src/train.py`, wrappers → `src/wrappers/`
+* **Checkpoints (G1–G5)** → `models/game{1..5}/`
+* **TensorBoard logs** → `results/tensorboard/`
+* **Saliency maps & video demos** → `results/` and `notebooks/`
+* **Ablation table & collapse graph** → `results/`
 
-#### **Phase 5: Submit & Deploy**
-*   [ ] Perform a **Stress Test**: Increase zombie spawn rate by 50% and document how the Hero's "Fire Discipline" allows them to survive longer than the Villain. Save stress test results to `results/stress_test/`.
-*   [ ] Add exploratory analysis notebooks to `notebooks/`.
-*   [ ] Finalize `README.md` and `docs/` documentation, then push all code/checkpoints to GitHub.
+---
+
+### Phase 1: The Villain Baseline (Game 1)
+* **Setup:** Default PettingZoo KAZ (Infinite ammo, no stamina costs, perfect vision).
+* **Training:** Standard $R = \text{Kills}$.
+* **Behavior:** The **"Greedy Soldier."** Charging zombies blindly, overlapping paths, zero coordination.
+* **Output:** Baseline metrics for Kill Density and Survival Time.
+
+### Phase 2: Resource Scarcity (Games 2 & 3)
+* **Game 2 (+ Ammo Restriction):**
+    * **Wrapper:** Archer has limited arrows per wave.
+    * **Penalty:** Negative reward for "Dry Fire" (firing when empty).
+    * **Goal:** Emergence of **Trigger Discipline**.
+* **Game 3 (+ Stamina Decay):**
+    * **Wrapper:** Knight loses reward for every $N$ pixels moved or sword swung.
+    * **Goal:** Emergence of **Economic Positioning**. The Knight stops "chasing" and starts "waiting."
+
+### Phase 3: The Altruistic Hero (Game 4)
+* **Game 4 (+ 60/40 Comrade Healthcare):**
+    * **Logic:** Reward for Agent $i = (0.6 \times \text{Self\_Reward}) + (0.4 \times \text{Teammate\_Reward})$.
+    * **Behavioral Shift:** The Knight becomes a **Guardian**. If the Archer is approached by a zombie, the Knight’s 40% stake in the Archer's health outweighs the stamina cost to travel and save them.
+    * **Goal:** Explicit coordination and perimeter defense.
+
+### Phase 4: Tactical Uncertainty (Game 5 - The Final Hero)
+* **Game 5 (+ Gaussian Fog):**
+    * **Wrapper:** Apply a Gaussian blur/noise to observations.
+    * **The "Fire Discipline" Peak:** Agents must integrate resource costs (G2/G3) and teammate safety (G4) with visual uncertainty.
+    * **Goal:** Agents withhold strikes until a zombie is mathematically "confirmed" within a certain proximity.
+
+---
+
+### Phase 5: Evaluation & Explainability
+1.  **Quantitative:**
+    * **Ablation Table:** A table comparing Kills/Resource Ratio across all 5 Games.
+    * **The "Collapse" Graph:** Show how Game 1 fails at 1.5x zombie density while Game 5 survives via efficiency.
+2.  **Qualitative (The "Explain" Box):**
+    * **Saliency Maps:** Show Game 1 attending only to the "Nearest Enemy" vs. Game 5 attending to the "Teammate + Fog Border."
+    * **Video Demo:** Side-by-side of the "Greedy Soldier" vs. the "Tactical Unit."
+
+---
+
+### 🚀 Immediate Next Steps for You:
+1.  **Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.
+2.  **Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it’s baked into the reward signal before it hits the PPO agent.
+
+You’re all set for the HW/Proposal. Since you're working solo, do you need a template for the **Saliency Map** implementation later on, or are you good with the training loop for now?

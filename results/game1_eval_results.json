@@ -1,11 +1,14 @@
 {
   "checkpoint": "models/game1/final.pt",
   "game_level": 1,
-  "episodes": 1,
-  "mean_return": 11.0,
-  "std_return": 0.0,
-  "mean_aggression": 11.0,
+  "episodes": 10,
+  "deterministic": false,
+  "mean_return": 5.8,
+  "std_return": 2.938537050983023,
+  "mean_raw_kills": 5.8,
+  "mean_aggression": 5.8,
   "mean_preservation": 0.0,
-  "mean_episode_length": 900.0,
-  "kill_density": 0.012222222222222223
+  "mean_episode_length": 532.7,
+  "raw_kill_density": 0.010887929416181715,
+  "kill_density": 0.010887929416181715
 }

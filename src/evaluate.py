@@ -28,6 +28,8 @@ def parse_args():
     p.add_argument("--render", action="store_true", help="Render human-visible window")
     p.add_argument("--record", action="store_true",
                     help="Record episodes as mp4 to results/game<N>_demo/")
+    p.add_argument("--deterministic", action="store_true",
+                    help="Use greedy (argmax) policy instead of sampling")
     p.add_argument("--seed", type=int, default=123)
     return p.parse_args()
 
@@ -81,6 +83,7 @@ def evaluate(args):
     # Run evaluation episodes
     all_returns = []
     all_lengths = []
+    all_raw_kills = []
     all_aggression = []
     all_preservation = []
 
@@ -89,6 +92,7 @@ def evaluate(args):
         obs_flat = flatten_obs(obs_raw)
         ep_return = defaultdict(float)
         ep_aggr = defaultdict(float)
+        ep_raw_kills = defaultdict(float)
         ep_pres = defaultdict(float)
         ep_len = 0
         frames = []
@@ -105,7 +109,11 @@ def evaluate(args):
                     obs_t = torch.tensor(
                         obs_flat[agent], dtype=torch.float32, device=device
                     ).unsqueeze(0)
-                    action, _, _, _, _ = net.get_action_and_value(obs_t)
+                    if args.deterministic:
+                        out = net.forward(obs_t)
+                        action = out["logits"].argmax(dim=-1)
+                    else:
+                        action, _, _, _, _ = net.get_action_and_value(obs_t)
                     actions[agent] = action.item()
 
             obs_raw, rewards, terms, truncs, infos = env.step(actions)
@@ -119,15 +127,18 @@ def evaluate(args):
             for agent in rewards:
                 ri = infos.get(agent, {}).get("reward_info", {})
                 ep_return[agent] += ri.get("total", rewards[agent])
+                ep_raw_kills[agent] += ri.get("raw_kill", 0.0)
                 ep_aggr[agent] += ri.get("aggression", 0.0)
                 ep_pres[agent] += ri.get("preservation", 0.0)
             ep_len += 1
 
         mean_ret = float(np.mean(list(ep_return.values())))
+        mean_raw_k = float(np.mean(list(ep_raw_kills.values())))
         mean_aggr = float(np.mean(list(ep_aggr.values())))
         mean_pres = float(np.mean(list(ep_pres.values())))
         all_returns.append(mean_ret)
         all_lengths.append(ep_len)
+        all_raw_kills.append(mean_raw_k)
         all_aggression.append(mean_aggr)
         all_preservation.append(mean_pres)
 
@@ -156,9 +167,11 @@ def evaluate(args):
     print(f"Evaluation Summary ({args.episodes} episodes, Game {game_level})")
     print("=" * 60)
     print(f"  Mean return:      {np.mean(all_returns):+.3f} +/- {np.std(all_returns):.3f}")
+    print(f"  Mean raw kills:   {np.mean(all_raw_kills):+.3f}")
     print(f"  Mean aggression:  {np.mean(all_aggression):+.3f}")
     print(f"  Mean preservation:{np.mean(all_preservation):+.3f}")
     print(f"  Mean ep length:   {np.mean(all_lengths):.1f}")
+    print(f"  Raw kill density: {np.mean(all_raw_kills) / max(np.mean(all_lengths), 1):.5f}")
     print(f"  Kill density:     {np.mean(all_aggression) / max(np.mean(all_lengths), 1):.5f}")
 
     # Save eval results
@@ -166,11 +179,14 @@ def evaluate(args):
         "checkpoint": args.checkpoint,
         "game_level": game_level,
         "episodes": args.episodes,
+        "deterministic": args.deterministic,
         "mean_return": float(np.mean(all_returns)),
         "std_return": float(np.std(all_returns)),
+        "mean_raw_kills": float(np.mean(all_raw_kills)),
         "mean_aggression": float(np.mean(all_aggression)),
         "mean_preservation": float(np.mean(all_preservation)),
         "mean_episode_length": float(np.mean(all_lengths)),
+        "raw_kill_density": float(np.mean(all_raw_kills) / max(np.mean(all_lengths), 1)),
         "kill_density": float(np.mean(all_aggression) / max(np.mean(all_lengths), 1)),
     }
     out_path = f"results/game{game_level}_eval_results.json"

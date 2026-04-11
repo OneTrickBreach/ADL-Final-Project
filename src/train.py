@@ -64,6 +64,7 @@ class RolloutBuffer:
         self.values = []
         self.agent_ids = []
         # Reward decomposition tracking
+        self.raw_kill_rewards = []
         self.aggression_rewards = []
         self.preservation_rewards = []
 
@@ -71,7 +72,7 @@ class RolloutBuffer:
         self.__init__()
 
     def add(self, agent_id, obs, action, log_prob, reward, done, value,
-            aggression=0.0, preservation=0.0):
+            raw_kill=0.0, aggression=0.0, preservation=0.0):
         self.agent_ids.append(agent_id)
         self.obs.append(obs)
         self.actions.append(action)
@@ -79,6 +80,7 @@ class RolloutBuffer:
         self.rewards.append(reward)
         self.dones.append(done)
         self.values.append(value)
+        self.raw_kill_rewards.append(raw_kill)
         self.aggression_rewards.append(aggression)
         self.preservation_rewards.append(preservation)
 
@@ -182,6 +184,7 @@ def train(args):
 
     # Running episode trackers
     ep_return = defaultdict(float)
+    ep_raw_kills = defaultdict(float)
     ep_aggression = defaultdict(float)
     ep_preservation = defaultdict(float)
     ep_length = 0
@@ -194,6 +197,7 @@ def train(args):
         buffer = RolloutBuffer()
         rollout_ep_returns = []
         rollout_ep_lengths = []
+        rollout_raw_kills = []
         rollout_aggression = []
         rollout_preservation = []
 
@@ -206,6 +210,9 @@ def train(args):
                 episode_lengths.append(ep_length)
                 rollout_ep_returns.append(mean_return)
                 rollout_ep_lengths.append(ep_length)
+                rollout_raw_kills.append(
+                    float(np.mean(list(ep_raw_kills.values()))) if ep_raw_kills else 0.0
+                )
                 rollout_aggression.append(
                     float(np.mean(list(ep_aggression.values()))) if ep_aggression else 0.0
                 )
@@ -214,6 +221,7 @@ def train(args):
                 )
                 episode_count += 1
                 ep_return = defaultdict(float)
+                ep_raw_kills = defaultdict(float)
                 ep_aggression = defaultdict(float)
                 ep_preservation = defaultdict(float)
                 ep_length = 0
@@ -254,6 +262,7 @@ def train(args):
 
             for agent in rewards:
                 ri = infos.get(agent, {}).get("reward_info", {})
+                raw_k = ri.get("raw_kill", 0.0)
                 aggr = ri.get("aggression", 0.0)
                 pres = ri.get("preservation", 0.0)
                 total = ri.get("total", rewards[agent])
@@ -262,10 +271,12 @@ def train(args):
                 buf_idx = agent_indices[agent]
                 buffer.rewards[buf_idx] = total
                 buffer.dones[buf_idx] = done
+                buffer.raw_kill_rewards[buf_idx] = raw_k
                 buffer.aggression_rewards[buf_idx] = aggr
                 buffer.preservation_rewards[buf_idx] = pres
 
                 ep_return[agent] += total
+                ep_raw_kills[agent] += raw_k
                 ep_aggression[agent] += aggr
                 ep_preservation[agent] += pres
 
@@ -356,11 +367,13 @@ def train(args):
             avg_entropy = float(np.mean(entropy_losses))
 
             # Reward decomposition (per rules.md #9)
+            avg_raw_kills = float(np.mean(buffer.raw_kill_rewards))
             avg_aggression = float(np.mean(buffer.aggression_rewards))
             avg_preservation = float(np.mean(buffer.preservation_rewards))
             avg_reward = float(np.mean(buffer.rewards))
 
             writer.add_scalar("reward/total", avg_reward, global_step)
+            writer.add_scalar("reward/raw_kills", avg_raw_kills, global_step)
             writer.add_scalar("reward/aggression", avg_aggression, global_step)
             writer.add_scalar("reward/preservation", avg_preservation, global_step)
             writer.add_scalar("policy/loss", avg_policy_loss, global_step)
@@ -371,10 +384,13 @@ def train(args):
             if rollout_ep_returns:
                 mean_ep_return = float(np.mean(rollout_ep_returns))
                 mean_ep_length = float(np.mean(rollout_ep_lengths))
+                mean_raw_kills = float(np.mean(rollout_raw_kills))
                 mean_aggr = float(np.mean(rollout_aggression))
                 mean_pres = float(np.mean(rollout_preservation))
                 writer.add_scalar("metrics/episode_return", mean_ep_return, global_step)
                 writer.add_scalar("metrics/episode_length", mean_ep_length, global_step)
+                writer.add_scalar("metrics/raw_kill_density",
+                                  mean_raw_kills / max(mean_ep_length, 1), global_step)
                 writer.add_scalar("metrics/kill_density",
                                   mean_aggr / max(mean_ep_length, 1), global_step)
                 writer.add_scalar("metrics/survival_time", mean_ep_length, global_step)

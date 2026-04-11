@@ -38,19 +38,26 @@ ADLProject2/
 
 ### Phase 1: The Villain Baseline (Game 1) ✅
 * **Setup:** Default PettingZoo KAZ (Infinite ammo, no stamina costs, perfect vision).
-* **Training:** Standard $R = \text{Kills}$. Trained 501,838 steps / 401 episodes.
+* **Training:** Standard $R = \text{Kills}$. Trained 502,586 steps / 409 episodes.
 * **Behavior:** The **"Greedy Soldier."** Charging zombies blindly, overlapping paths, zero coordination.
-* **Results:** Mean return 3.93 ± 3.91 | Kill density 0.0102 | Mean ep length 386 steps.
+* **Results:** Mean return 5.80 ± 2.94 | Raw kill density 0.01089 | Mean ep length 533 steps.
 * **Artifacts:** `models/game1/final.pt`, `results/game1_baseline_metrics.json`, `results/game1_demo/`.
 
-### Phase 2: Resource Scarcity (Games 2 & 3)
+### Phase 2: Resource Scarcity (Games 2 & 3) ✅
 * **Game 2 (+ Ammo Restriction):**
-    * **Wrapper:** Archer has limited arrows per wave.
-    * **Penalty:** Negative reward for "Dry Fire" (firing when empty).
-    * **Goal:** Emergence of **Trigger Discipline**.
+    * **Wrapper:** Archer has 15 arrows/episode, −0.5 dry-fire penalty.
+    * **Training:** 504,134 steps / 676 episodes.
+    * **Behavior:** The **"Risk Avoider."** Archer suppresses shooting entirely (0.15% shoot rate under deterministic eval); raw kill density drops 2.5× from G1.
+    * **Results:** Mean return 0.30 ± 0.39 | Raw kills 0.85 | Raw kill density 0.00431 | Mean ep length 197 steps.
+    * **Artifacts:** `models/game2/final.pt`, `results/game2_eval_results.json`, `results/game2_demo/`.
 * **Game 3 (+ Stamina Decay):**
-    * **Wrapper:** Knight loses reward for every $N$ pixels moved or sword swung.
-    * **Goal:** Emergence of **Economic Positioning**. The Knight stops "chasing" and starts "waiting."
+    * **Wrapper:** Knight pays 0.01/move + 0.05/attack on top of G2 ammo limits.
+    * **Training:** 500,641 steps / 697 episodes.
+    * **Behavior:** The **"Fully Passive."** Knight drops attack to 0% under deterministic eval; penalty avoidance dominates the reward signal.
+    * **Results:** Mean return 0.15 ± 0.24 | Raw kills 0.50 | Raw kill density 0.00279 | Mean ep length 179 steps.
+* **Key Finding:** Penalties too strong relative to kill reward → agents learn **avoidance, not efficiency**. Phase 3 should tune penalty magnitudes before stacking 60/40 comrade reward.
+    * **Artifacts:** `models/game3/final.pt`, `results/game3_eval_results.json`, `results/game3_demo/`.
+* **Analysis:** `results/phase2_ablation_table.md`, `results/phase2_observations.md`.
 
 ### Phase 3: The Altruistic Hero (Game 4)
 * **Game 4 (+ 60/40 Comrade Healthcare):**
@@ -79,4 +86,5 @@ ADLProject2/
 ### 🚀 Immediate Next Steps:
 1.  ~~**Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.~~ ✅ Done
 2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
-3.  **Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.
+3.  ~~**Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.~~ ✅ Done
+4.  **Phase 3:** Train Game 4 (60/40 comrade healthcare) — reward scalarizer already wired in `KAZWrapper`.

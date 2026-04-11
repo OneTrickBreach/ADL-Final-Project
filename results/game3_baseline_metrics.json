@@ -1,0 +1,8 @@
+{
+  "game_level": 3,
+  "total_timesteps": 500641,
+  "episodes": 697,
+  "mean_episode_return": 0.195,
+  "mean_episode_length": 182.2,
+  "mean_kill_density": 0.001070252469813392
+}

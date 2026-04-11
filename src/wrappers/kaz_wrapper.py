@@ -41,7 +41,8 @@ class KAZWrapper:
         assert 1 <= game_level <= 5, f"game_level must be 1-5, got {game_level}"
         self.game_level = game_level
         self.vector_state = vector_state
-        self.seed = seed
+        self._initial_seed = seed
+        self._seeded = False
 
         # Feature flags (activated by game level)
         self.ammo_limit_enabled = game_level >= 2
@@ -109,7 +110,16 @@ class KAZWrapper:
     # ------------------------------------------------------------------
     def reset(self, seed=None):
         """Reset env and internal modifier state."""
-        obs, infos = self._env.reset(seed=seed if seed is not None else self.seed)
+        # Use initial seed only on the first reset for reproducibility;
+        # subsequent resets let the internal RNG vary for diverse episodes.
+        if seed is not None:
+            reset_seed = seed
+        elif not self._seeded and self._initial_seed is not None:
+            reset_seed = self._initial_seed
+            self._seeded = True
+        else:
+            reset_seed = None
+        obs, infos = self._env.reset(seed=reset_seed)
 
         # Reset ammo counters
         self.archer_ammo = {
@@ -172,6 +182,7 @@ class KAZWrapper:
             if agent not in infos:
                 infos[agent] = {}
             infos[agent]["reward_info"] = {
+                "raw_kill": float(raw_rewards[agent]),
                 "aggression": reward_aggression,
                 "preservation": reward_preservation,
                 "total": total_reward,

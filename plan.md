@@ -59,17 +59,21 @@ ADLProject2/
     * **Artifacts:** `models/game3/final.pt`, `results/game3_eval_results.json`, `results/game3_demo/`.
 * **Analysis:** `results/phase2_ablation_table.md`, `results/phase2_observations.md`.
 
-### Phase 3: The Altruistic Hero (Game 4)
-* **Game 4 (+ 60/40 Comrade Healthcare):**
+### Phase 3: The Altruistic Hero (Game 4) ✅
+* **Game 4 (+ 60/40 Comrade Healthcare + Entity Self-Attention):**
     * **Logic:** Reward for Agent $i$: $R_i = (0.6 \times R_{\text{self}}) + (0.4 \times R_{\text{team}})$.
-    * **Behavioral Shift:** The Knight becomes a **Guardian**. If the Archer is approached by a zombie, the Knight’s 40% stake in the Archer's health outweighs the stamina cost to travel and save them.
-    * **Goal:** Explicit coordination and perimeter defense.
+    * **Architecture:** EntityAttentionEncoder — multi-head self-attention over (27 entities × 5 features) observation structure. 430K params (vs 200K MLP).
+    * **Training:** 507,960 steps / 706 episodes.
+    * **Behavior:** The **"Recovering Cooperator."** Kill density reverses downward trend (+29% from G3). Team reward flows (mean preservation +0.68). Archers shoot 8.6% stochastically (up from 0% in G3). But deterministic policy remains passive (0 kills) — the policy mode hasn't shifted to offensive.
+    * **Results:** Mean return 0.53 ± 0.35 | Raw kills 0.68 | Raw kill density 0.00361 | Preservation 0.68 | Mean ep length 187 steps.
+    * **Artifacts:** `models/game4/final.pt`, `results/game4_eval_results.json`, `results/game4_demo/`.
+* **Analysis:** `results/ablation_table.md`, `results/phase3_observations.md`.
 
 ### Phase 4: Tactical Uncertainty (Game 5 - The Final Hero)
 * **Game 5 (+ Gaussian Fog):**
     * **Wrapper:** Apply a Gaussian blur/noise to observations.
     * **The "Fire Discipline" Peak:** Agents must integrate resource costs (G2/G3) and teammate safety (G4) with visual uncertainty.
-    * **Goal:** Agents withhold strikes until a zombie is mathematically "confirmed" within a certain proximity.
+    * **Goal:** Explicit coordination and perimeter defense.
 
 ---
 
@@ -87,4 +91,5 @@ ADLProject2/
 1.  ~~**Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.~~ ✅ Done
 2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
 3.  ~~**Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.~~ ✅ Done
-4.  **Phase 3:** Train Game 4 (60/40 comrade healthcare) — reward scalarizer already wired in `KAZWrapper`.
+4.  ~~**Phase 3:** Train Game 4 (60/40 comrade healthcare + entity self-attention).~~ ✅ Done
+5.  **Phase 4:** Train Game 5 (Gaussian fog + GRU recurrence) — the Final Hero.

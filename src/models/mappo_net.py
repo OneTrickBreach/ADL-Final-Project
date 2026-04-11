@@ -14,30 +14,103 @@ import torch.nn as nn
 from torch.distributions import Categorical
 
 
-class MAPPONet(nn.Module):
-    """Shared-parameter actor-critic network for MAPPO."""
+class EntityAttentionEncoder(nn.Module):
+    """Entity-level self-attention for structured (num_entities, entity_dim) observations.
 
-    def __init__(self, obs_dim: int, act_dim: int, hidden_dim: int = 256):
+    Reshapes a flat observation vector into entity slots, projects each entity
+    to hidden_dim, applies multi-head self-attention (masking out zero-padded
+    entities), and mean-pools over active entities to produce a fixed-size
+    representation.
+    """
+
+    def __init__(self, entity_dim: int, num_entities: int,
+                 hidden_dim: int, num_heads: int = 4):
+        super().__init__()
+        self.entity_dim = entity_dim
+        self.num_entities = num_entities
+        self.hidden_dim = hidden_dim
+
+        # Project each entity's raw features to hidden_dim
+        self.entity_embed = nn.Linear(entity_dim, hidden_dim)
+
+        # Multi-head self-attention over entity slots
+        self.attention = nn.MultiheadAttention(
+            embed_dim=hidden_dim, num_heads=num_heads, batch_first=True,
+        )
+        self.norm = nn.LayerNorm(hidden_dim)
+
+    def forward(self, obs_flat: torch.Tensor) -> torch.Tensor:
+        """Args: obs_flat (batch, num_entities * entity_dim). Returns (batch, hidden_dim)."""
+        batch = obs_flat.shape[0]
+        entities = obs_flat.view(batch, self.num_entities, self.entity_dim)
+
+        # Padding mask: True = IGNORE (zero-padded entity)
+        padding_mask = (entities.abs().sum(dim=-1) < 1e-6)  # (batch, num_entities)
+
+        # Embed entities
+        embedded = self.entity_embed(entities)  # (batch, N, hidden_dim)
+
+        # Self-attention with padding mask
+        attended, _ = self.attention(
+            embedded, embedded, embedded, key_padding_mask=padding_mask,
+        )
+
+        # Residual connection + LayerNorm
+        features = self.norm(attended + embedded)
+
+        # Mean pool over non-padded entities only
+        active = (~padding_mask).unsqueeze(-1).float()       # (batch, N, 1)
+        pooled = (features * active).sum(dim=1) / active.sum(dim=1).clamp(min=1)
+
+        return pooled  # (batch, hidden_dim)
+
+
+class MAPPONet(nn.Module):
+    """Shared-parameter actor-critic network for MAPPO.
+
+    Supports multiple encoder architectures:
+      'mlp'       — standard 2-layer MLP backbone (G1–G3)
+      'attention'  — entity self-attention encoder (G4+)
+    """
+
+    ARCH_CHOICES = ("mlp", "attention")
+
+    def __init__(self, obs_dim: int, act_dim: int, hidden_dim: int = 256,
+                 arch: str = "mlp",
+                 num_entities: int = 27, entity_dim: int = 5,
+                 num_heads: int = 4):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
+        self.arch = arch
 
-        # Shared backbone
-        self.backbone = nn.Sequential(
-            nn.Linear(obs_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-        )
+        # ── Encoder ──────────────────────────────────────────
+        if arch == "mlp":
+            self.backbone = nn.Sequential(
+                nn.Linear(obs_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+            )
+        elif arch == "attention":
+            self.entity_attention = EntityAttentionEncoder(
+                entity_dim, num_entities, hidden_dim, num_heads,
+            )
+            self.backbone = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+            )
+        else:
+            raise ValueError(f"Unknown arch '{arch}', expected one of {self.ARCH_CHOICES}")
 
-        # Policy head (actor)
+        # ── Policy head (actor) ──────────────────────────────
         self.policy_head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, act_dim),
         )
 
-        # Value head (critic) — outputs scalar state-value
+        # ── Value head (critic) ──────────────────────────────
         self.value_head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
@@ -45,7 +118,6 @@ class MAPPONet(nn.Module):
         )
 
         # Reward decomposition heads for interpretability logging
-        # These predict the *component* values (aggression, preservation)
         self.aggression_head = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 4),
             nn.ReLU(),
@@ -84,7 +156,11 @@ class MAPPONet(nn.Module):
                     "preservation": (batch, 1),
                 }
         """
-        features = self.backbone(obs)
+        if self.arch == "attention":
+            attn_out = self.entity_attention(obs)
+            features = self.backbone(attn_out)
+        else:
+            features = self.backbone(obs)
         logits = self.policy_head(features)
         value = self.value_head(features)
         reward_decomposition = {

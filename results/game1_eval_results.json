@@ -1,0 +1,11 @@
+{
+  "checkpoint": "models/game1/final.pt",
+  "game_level": 1,
+  "episodes": 1,
+  "mean_return": 11.0,
+  "std_return": 0.0,
+  "mean_aggression": 11.0,
+  "mean_preservation": 0.0,
+  "mean_episode_length": 900.0,
+  "kill_density": 0.012222222222222223
+}

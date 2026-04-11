@@ -24,7 +24,7 @@ ADLProject2/
 ├── docs/                       # Documentation and writeup assets
 ├── plan.md                     # This file — check before every task
 ├── rules.md                    # Execution rules for this project
-└── venv/                       # Project-scoped virtual environment
+└── .venv/                      # Project-scoped virtual environment
 ```
 
 **Artifact mapping by phase:**
@@ -36,11 +36,12 @@ ADLProject2/
 
 ---
 
-### Phase 1: The Villain Baseline (Game 1)
+### Phase 1: The Villain Baseline (Game 1) ✅
 * **Setup:** Default PettingZoo KAZ (Infinite ammo, no stamina costs, perfect vision).
-* **Training:** Standard $R = \text{Kills}$.
+* **Training:** Standard $R = \text{Kills}$. Trained 501,838 steps / 401 episodes.
 * **Behavior:** The **"Greedy Soldier."** Charging zombies blindly, overlapping paths, zero coordination.
-* **Output:** Baseline metrics for Kill Density and Survival Time.
+* **Results:** Mean return 3.93 ± 3.91 | Kill density 0.0102 | Mean ep length 386 steps.
+* **Artifacts:** `models/game1/final.pt`, `results/game1_baseline_metrics.json`, `results/game1_demo/`.
 
 ### Phase 2: Resource Scarcity (Games 2 & 3)
 * **Game 2 (+ Ammo Restriction):**
@@ -75,8 +76,7 @@ ADLProject2/
 
 ---
 
-### 🚀 Immediate Next Steps for You:
-1.  **Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.
-2.  **Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it’s baked into the reward signal before it hits the PPO agent.
-
-You’re all set for the HW/Proposal. Since you're working solo, do you need a template for the **Saliency Map** implementation later on, or are you good with the training loop for now?
+### 🚀 Immediate Next Steps:
+1.  ~~**Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.~~ ✅ Done
+2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
+3.  **Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.

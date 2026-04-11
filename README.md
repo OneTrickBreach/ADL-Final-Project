@@ -37,18 +37,18 @@ ADLProject2/
 ├── src/
 │   ├── wrappers/        # KAZWrapper — toggles ammo, stamina, fog by game_level
 │   ├── models/          # MAPPO network definitions and reward heads
-│   └── train.py         # Main training entry point
-├── test/
-│   ├── smoke_test.py    # Full component check (imports, env, CUDA, TensorBoard)
-│   └── test_render.py   # GUI render test
+│   ├── train.py         # Main training entry point
+│   ├── evaluate.py      # Checkpoint evaluation, metrics export, video recording
+│   └── test_env.py      # Environment smoke test
 ├── notebooks/           # Saliency map prototyping, exploratory analysis
 ├── data/
 │   ├── raw/             # Unprocessed environment recordings
 │   └── processed/       # Preprocessed observations
 ├── models/              # Checkpoints per game level (game1/ … game5/)
 ├── results/
-│   └── tensorboard/     # SummaryWriter logs
-├── docs/                # Documentation and writeup assets
+│   ├── tensorboard/     # SummaryWriter logs (Reward Decomposition per run)
+│   └── game1_demo/      # Recorded gameplay videos
+├── docs/                # Phase plans and documentation
 ├── requirements.txt     # Pinned dependencies
 ├── plan.md              # Project roadmap — check before every task
 └── rules.md             # Execution rules for this project
@@ -86,15 +86,45 @@ pip install "pettingzoo[butterfly]" gymnasium supersuit tensorboard opencv-pytho
 
 ---
 
-## Running Tests
+## Quick Start
 
 ```bash
-# Full component smoke test (imports, env rollout, CUDA, TensorBoard)
-.venv/bin/python test/smoke_test.py
+# Smoke test — verify env + wrapper
+./.venv/bin/python src/test_env.py
 
-# GUI render test — opens the KAZ game window with random agents
-.venv/bin/python test/test_render.py
+# Train Game 1 baseline (500k steps, ~20 min on RTX 5070 Ti)
+./.venv/bin/python src/train.py --game_level 1 --total_timesteps 500000
+
+# Evaluate a checkpoint (10 episodes)
+./.venv/bin/python src/evaluate.py --checkpoint models/game1/final.pt --episodes 10
 ```
+
+---
+
+## Watch & Record Gameplay
+
+```bash
+# Watch Game 1 live in a window
+./.venv/bin/python src/evaluate.py --checkpoint models/game1/final.pt --episodes 3 --render
+
+# Record episodes as mp4 videos → results/game1_demo/
+./.venv/bin/python src/evaluate.py --checkpoint models/game1/final.pt --episodes 3 --record
+
+# Play a recorded video (install vlc/mpv if needed)
+vlc results/game1_demo/episode_1.mp4
+```
+
+---
+
+## Progress
+
+| Phase | Status | Key Result |
+|-------|--------|------------|
+| **Phase 1** — Villain Baseline (G1) | ✅ Complete | Kill density 0.0102, mean return 3.93 ± 3.91 |
+| **Phase 2** — Resource Scarcity (G2, G3) | ⬚ Pending | |
+| **Phase 3** — Altruistic Hero (G4) | ⬚ Pending | |
+| **Phase 4** — Tactical Uncertainty (G5) | ⬚ Pending | |
+| **Phase 5** — Evaluation & Explainability | ⬚ Pending | |
 
 ---
 

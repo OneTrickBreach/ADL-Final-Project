@@ -43,14 +43,20 @@ ADLProject2/
 * **Results:** Mean return 3.93 ± 3.91 | Kill density 0.0102 | Mean ep length 386 steps.
 * **Artifacts:** `models/game1/final.pt`, `results/game1_baseline_metrics.json`, `results/game1_demo/`.
 
-### Phase 2: Resource Scarcity (Games 2 & 3)
+### Phase 2: Resource Scarcity (Games 2 & 3) ✅
 * **Game 2 (+ Ammo Restriction):**
-    * **Wrapper:** Archer has limited arrows per wave.
-    * **Penalty:** Negative reward for "Dry Fire" (firing when empty).
-    * **Goal:** Emergence of **Trigger Discipline**.
+    * **Wrapper:** Archer has 15 arrows/episode, −0.5 dry-fire penalty.
+    * **Training:** 507,273 steps / 642 episodes.
+    * **Behavior:** The **"Selective Marksman."** Archer stops spamming shots; kill density drops 3.7× from G1.
+    * **Results:** Mean return 0.55 ± 0.28 | Kill density 0.00279 | Mean ep length 197 steps.
+    * **Artifacts:** `models/game2/final.pt`, `results/game2_eval_results.json`, `results/game2_demo/`.
 * **Game 3 (+ Stamina Decay):**
-    * **Wrapper:** Knight loses reward for every $N$ pixels moved or sword swung.
-    * **Goal:** Emergence of **Economic Positioning**. The Knight stops "chasing" and starts "waiting."
+    * **Wrapper:** Knight pays 0.01/move + 0.05/attack on top of G2 ammo limits.
+    * **Training:** 500,839 steps / 663 episodes.
+    * **Behavior:** The **"Stationary Defender."** Knight minimizes movement; entropy collapses (1.79 → 0.83).
+    * **Results:** Mean return 0.10 ± 0.32 | Kill density 0.00049 | Mean ep length 201 steps.
+    * **Artifacts:** `models/game3/final.pt`, `results/game3_eval_results.json`, `results/game3_demo/`.
+* **Analysis:** `results/phase2_ablation_table.md`, `results/phase2_observations.md`.
 
 ### Phase 3: The Altruistic Hero (Game 4)
 * **Game 4 (+ 60/40 Comrade Healthcare):**
@@ -79,4 +85,5 @@ ADLProject2/
 ### 🚀 Immediate Next Steps:
 1.  ~~**Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.~~ ✅ Done
 2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
-3.  **Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.
+3.  ~~**Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.~~ ✅ Done
+4.  **Phase 3:** Train Game 4 (60/40 comrade healthcare) — reward scalarizer already wired in `KAZWrapper`.

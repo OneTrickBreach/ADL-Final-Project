@@ -121,7 +121,7 @@ vlc results/game1_demo/episode_1.mp4
 | Phase | Status | Key Result |
 |-------|--------|------------|
 | **Phase 1** — Villain Baseline (G1) | ✅ Complete | Kill density 0.0102, mean return 3.93 ± 3.91 |
-| **Phase 2** — Resource Scarcity (G2, G3) | ⬚ Pending | |
+| **Phase 2** — Resource Scarcity (G2, G3) | ✅ Complete | G2: return 0.55 ± 0.28, kill density 0.00279 · G3: return 0.10 ± 0.32, kill density 0.00049 |
 | **Phase 3** — Altruistic Hero (G4) | ⬚ Pending | |
 | **Phase 4** — Tactical Uncertainty (G5) | ⬚ Pending | |
 | **Phase 5** — Evaluation & Explainability | ⬚ Pending | |

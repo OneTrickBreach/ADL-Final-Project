@@ -267,17 +267,17 @@ After successful training and evaluation:
 
 | Artifact | Path | Status |
 |----------|------|--------|
-| Game 2 checkpoint | `models/game2/final.pt` | ⬚ |
-| Game 2 metrics | `results/game2_baseline_metrics.json` | ⬚ |
-| Game 2 eval results | `results/game2_eval_results.json` | ⬚ |
-| Game 2 demo videos | `results/game2_demo/` | ⬚ |
-| Game 2 TensorBoard logs | `results/tensorboard/game2/` | ⬚ |
-| Game 3 checkpoint | `models/game3/final.pt` | ⬚ |
-| Game 3 metrics | `results/game3_baseline_metrics.json` | ⬚ |
-| Game 3 eval results | `results/game3_eval_results.json` | ⬚ |
-| Game 3 demo videos | `results/game3_demo/` | ⬚ |
-| Game 3 TensorBoard logs | `results/tensorboard/game3/` | ⬚ |
-| Phase 2 ablation table | `results/phase2_ablation_table.md` | ⬚ |
-| Phase 2 observations | `results/phase2_observations.md` | ⬚ |
-| `plan.md` updated | `plan.md` | ⬚ |
-| `README.md` updated | `README.md` | ⬚ |
+| Game 2 checkpoint | `models/game2/final.pt` | ✅ |
+| Game 2 metrics | `results/game2_baseline_metrics.json` | ✅ |
+| Game 2 eval results | `results/game2_eval_results.json` | ✅ |
+| Game 2 demo videos | `results/game2_demo/` | ✅ |
+| Game 2 TensorBoard logs | `results/tensorboard/game2/` | ✅ |
+| Game 3 checkpoint | `models/game3/final.pt` | ✅ |
+| Game 3 metrics | `results/game3_baseline_metrics.json` | ✅ |
+| Game 3 eval results | `results/game3_eval_results.json` | ✅ |
+| Game 3 demo videos | `results/game3_demo/` | ✅ |
+| Game 3 TensorBoard logs | `results/tensorboard/game3/` | ✅ |
+| Phase 2 ablation table | `results/phase2_ablation_table.md` | ✅ |
+| Phase 2 observations | `results/phase2_observations.md` | ✅ |
+| `plan.md` updated | `plan.md` | ✅ |
+| `README.md` updated | `README.md` | ✅ |

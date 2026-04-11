@@ -46,9 +46,13 @@ def evaluate(args):
     train_args = ckpt["args"]
     game_level = train_args["game_level"]
     hidden_dim = train_args.get("hidden_dim", 256)
+    arch = train_args.get("arch", "mlp")
+    num_entities = train_args.get("num_entities", 27)
+    entity_dim = train_args.get("entity_dim", 5)
+    num_heads = train_args.get("num_heads", 4)
 
     print(f"[eval] Checkpoint: {args.checkpoint}")
-    print(f"[eval] Game level: {game_level}, trained for {ckpt['global_step']} steps")
+    print(f"[eval] Game level: {game_level}, arch: {arch}, trained for {ckpt['global_step']} steps")
 
     # Environment
     render_mode = None
@@ -76,7 +80,11 @@ def evaluate(args):
     act_dim = env.action_space(env.agents[0]).n
 
     # Network
-    net = MAPPONet(obs_dim=obs_dim, act_dim=act_dim, hidden_dim=hidden_dim).to(device)
+    net = MAPPONet(
+        obs_dim=obs_dim, act_dim=act_dim, hidden_dim=hidden_dim,
+        arch=arch, num_entities=num_entities,
+        entity_dim=entity_dim, num_heads=num_heads,
+    ).to(device)
     net.load_state_dict(ckpt["model_state_dict"])
     net.eval()
 

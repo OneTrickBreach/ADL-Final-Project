@@ -39,6 +39,15 @@ def parse_args():
     p.add_argument("--rollout_steps", type=int, default=2048,
                     help="Steps to collect per rollout before updating")
     p.add_argument("--hidden_dim", type=int, default=256)
+    p.add_argument("--arch", type=str, default="mlp",
+                    choices=["mlp", "attention"],
+                    help="Network architecture: mlp (G1-G3), attention (G4+)")
+    p.add_argument("--num_entities", type=int, default=27,
+                    help="Number of entity slots in observation (for attention arch)")
+    p.add_argument("--entity_dim", type=int, default=5,
+                    help="Features per entity slot (for attention arch)")
+    p.add_argument("--num_heads", type=int, default=4,
+                    help="Number of attention heads (for attention arch)")
     p.add_argument("--ent_coef", type=float, default=0.01)
     p.add_argument("--vf_coef", type=float, default=0.5)
     p.add_argument("--max_grad_norm", type=float, default=0.5)
@@ -162,7 +171,11 @@ def train(args):
     print(f"[train] obs_dim={obs_dim}, act_dim={act_dim}, agents={env.possible_agents}")
 
     # Network + optimizer
-    net = MAPPONet(obs_dim=obs_dim, act_dim=act_dim, hidden_dim=args.hidden_dim).to(device)
+    net = MAPPONet(
+        obs_dim=obs_dim, act_dim=act_dim, hidden_dim=args.hidden_dim,
+        arch=args.arch, num_entities=args.num_entities,
+        entity_dim=args.entity_dim, num_heads=args.num_heads,
+    ).to(device)
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
     print(f"[train] Network params: {sum(p.numel() for p in net.parameters()):,}")
 

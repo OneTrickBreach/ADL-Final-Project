@@ -29,6 +29,40 @@ Game 4 adds **60/40 comrade healthcare** — the first *cooperative* signal in t
 
 ---
 
+## Architecture: Entity Self-Attention
+
+Phase 3 introduces the first **advanced DL mechanism** in the ablation: a **multi-head self-attention encoder** that operates over entity slots in the observation.
+
+### Why Attention Here
+G1-G3 used a flat MLP that treats the 135-dim observation as an unstructured vector. But the KAZ observation is actually *structured*: **(27 entity slots × 5 features)** — self, teammates, zombies, arrows. The MLP has no mechanism to reason about relationships between entities.
+
+Attention lets each entity slot attend to every other slot. The knight can now *weight* the archer's position when deciding whether to move. The archer can attend to zombie proximity when choosing to shoot.
+
+### Architecture Diagram
+```
+Obs (batch, 135) → reshape (batch, 27, 5)
+  → Linear(5, 256) per entity              # entity embedding
+  → MultiHeadSelfAttention(256, 4 heads)   # cross-entity reasoning
+  → Residual + LayerNorm
+  → MaskedMeanPool over active entities     # (batch, 256)
+  → Linear(256, 256) + ReLU                 # backbone
+  → Policy Head / Value Head
+```
+
+**430,729 params** (vs 200,329 for MLP) — the capacity increase comes from meaningful relational reasoning, not brute-force width.
+
+### The Ablation Slide (for class presentation)
+```
+G1: MLP           + Kill reward       → Greedy Soldier
+G2: MLP           + Ammo penalty      → Risk Avoider
+G3: MLP           + Stamina penalty   → Fully Passive
+G4: MLP+Attention + Team reward       → The Guardian      ← RECOVERY
+G5: MLP+Attn+GRU  + Fog               → Fire Discipline   ← THE HERO
+```
+Each row adds ONE thing. Clean ablation.
+
+---
+
 ## Pre-Flight Checks
 
 ### 1. Verify Wrapper Configuration
@@ -91,6 +125,7 @@ env.close()
 ```bash
 ./.venv/bin/python src/train.py \
     --game_level 4 \
+    --arch attention \
     --total_timesteps 5000 \
     --rollout_steps 256 \
     --log_interval 1 \
@@ -101,6 +136,7 @@ env.close()
 **Verify in output:**
 - `pres` values appear in the log lines (not always zero)
 - No crashes or NaN losses
+- Network params: ~430,729 (confirms attention encoder loaded)
 - TensorBoard directory created at `results/tensorboard/game4/`
 
 ---
@@ -111,11 +147,12 @@ env.close()
 ```bash
 ./.venv/bin/python src/train.py \
     --game_level 4 \
+    --arch attention \
     --total_timesteps 500000 \
     --max_cycles 900
 ```
 
-**Hyperparameters:** Same as G1-G3 defaults (lr=3e-4, gamma=0.99, rollout=2048, etc.). The team reward changes the optimization landscape without requiring hyperparameter surgery.
+**Hyperparameters:** Same as G1-G3 defaults (lr=3e-4, gamma=0.99, rollout=2048, etc.). The attention encoder and team reward change the optimization landscape without requiring hyperparameter surgery.
 
 **What to watch in TensorBoard during training:**
 ```bash
@@ -166,7 +203,8 @@ ta = ckpt['args']
 
 env = KAZWrapper(game_level=4, vector_state=True, seed=123)
 obs, _ = env.reset()
-net = MAPPONet(obs_dim=135, act_dim=6, hidden_dim=ta.get('hidden_dim', 256)).to(device)
+arch = ta.get('arch', 'mlp')
+net = MAPPONet(obs_dim=135, act_dim=6, hidden_dim=ta.get('hidden_dim', 256), arch=arch).to(device)
 net.load_state_dict(ckpt['model_state_dict'])
 net.eval()
 
@@ -280,5 +318,6 @@ Create `results/phase3_observations.md` with:
 Phase 4 adds Gaussian fog on top of everything. For G5 to be "miles better":
 - G4 must establish a solid cooperative baseline with meaningful kill density recovery
 - G5's fog will test whether the team coordination learned in G4 is robust to perceptual noise
+- **Architecture upgrade:** Add **GRU recurrence** on top of attention. This gives agents temporal memory — they can track zombie positions even when fogged out. Narrative: "Attention coordinates the team. Memory lets them trust that coordination even when they can't see."
 - If G4 shows strong guardian behavior, G5 should maintain it even under uncertainty — agents that trust their teammates' positions will outperform agents that panic under fog
 - Consider: G5 may benefit from slightly longer training (750K-1M steps) since partial observability makes credit assignment harder

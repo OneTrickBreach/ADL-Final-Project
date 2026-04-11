@@ -155,7 +155,7 @@ def train(args):
 
     device = torch.device("cuda")
     print(f"[train] Device: {device} ({torch.cuda.get_device_name(0)})")
-    print(f"[train] Game level: {args.game_level}")
+    print(f"[train] Game level: {args.game_level}, arch: {args.arch}")
 
     # Environment
     env = KAZWrapper(

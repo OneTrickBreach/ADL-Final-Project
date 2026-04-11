@@ -11,6 +11,7 @@ import os
 import sys
 from collections import defaultdict
 
+import cv2
 import numpy as np
 import torch
 
@@ -25,6 +26,8 @@ def parse_args():
                     help="Path to .pt checkpoint file")
     p.add_argument("--episodes", type=int, default=10)
     p.add_argument("--render", action="store_true", help="Render human-visible window")
+    p.add_argument("--record", action="store_true",
+                    help="Record episodes as mp4 to results/game<N>_demo/")
     p.add_argument("--seed", type=int, default=123)
     return p.parse_args()
 
@@ -46,12 +49,25 @@ def evaluate(args):
     print(f"[eval] Game level: {game_level}, trained for {ckpt['global_step']} steps")
 
     # Environment
+    render_mode = None
+    if args.render:
+        render_mode = "human"
+    elif args.record:
+        render_mode = "rgb_array"
+
     env = KAZWrapper(
         game_level=game_level,
         vector_state=True,
-        render_mode="human" if args.render else None,
+        render_mode=render_mode,
         seed=args.seed,
     )
+
+    # Recording setup
+    video_dir = None
+    if args.record:
+        video_dir = f"results/game{game_level}_demo"
+        os.makedirs(video_dir, exist_ok=True)
+        print(f"[eval] Recording to {video_dir}/")
     obs_raw, _ = env.reset()
     obs_flat = flatten_obs(obs_raw)
     obs_dim = list(obs_flat.values())[0].shape[0]
@@ -75,6 +91,12 @@ def evaluate(args):
         ep_aggr = defaultdict(float)
         ep_pres = defaultdict(float)
         ep_len = 0
+        frames = []
+
+        if args.record:
+            frame = env.render()
+            if frame is not None:
+                frames.append(frame)
 
         while env.agents:
             actions = {}
@@ -88,6 +110,11 @@ def evaluate(args):
 
             obs_raw, rewards, terms, truncs, infos = env.step(actions)
             obs_flat = flatten_obs(obs_raw) if env.agents else {}
+
+            if args.record:
+                frame = env.render()
+                if frame is not None:
+                    frames.append(frame)
 
             for agent in rewards:
                 ri = infos.get(agent, {}).get("reward_info", {})
@@ -104,10 +131,23 @@ def evaluate(args):
         all_aggression.append(mean_aggr)
         all_preservation.append(mean_pres)
 
-        print(
-            f"  Episode {ep+1:>3d}: return={mean_ret:+.2f}  "
-            f"aggr={mean_aggr:+.2f}  pres={mean_pres:+.2f}  len={ep_len}"
-        )
+        # Save video if recording
+        if args.record and frames:
+            video_path = os.path.join(video_dir, f"episode_{ep+1}.mp4")
+            h, w = frames[0].shape[:2]
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            writer_vid = cv2.VideoWriter(video_path, fourcc, 30, (w, h))
+            for frame in frames:
+                writer_vid.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            writer_vid.release()
+            print(f"  Episode {ep+1:>3d}: return={mean_ret:+.2f}  "
+                  f"aggr={mean_aggr:+.2f}  pres={mean_pres:+.2f}  "
+                  f"len={ep_len}  -> {video_path}")
+        else:
+            print(
+                f"  Episode {ep+1:>3d}: return={mean_ret:+.2f}  "
+                f"aggr={mean_aggr:+.2f}  pres={mean_pres:+.2f}  len={ep_len}"
+            )
 
     env.close()
 

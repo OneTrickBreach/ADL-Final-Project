@@ -92,12 +92,22 @@ Train a Multi-Agent PPO (MAPPO) policy on the default PettingZoo Knights-Archers
 ---
 
 ## Success Criteria for Phase 1
-- [ ] KAZ env runs inside the wrapper with `game_level=1` on CUDA.
-- [ ] MAPPO trains without errors for 500k+ timesteps.
-- [ ] TensorBoard logs show reward decomposition (Aggression vs. Preservation).
-- [ ] Baseline metrics (Kill Density, Survival Time) are saved to `results/`.
-- [ ] Checkpoint saved to `models/game1/final.pt`.
-- [ ] Agents exhibit "Greedy Soldier" behavior (no coordination, pure aggression).
+- [x] KAZ env runs inside the wrapper with `game_level=1` on CUDA.
+- [x] MAPPO trains without errors for 500k+ timesteps (501,838 steps, 401 episodes).
+- [x] TensorBoard logs show reward decomposition (Aggression vs. Preservation).
+- [x] Baseline metrics (Kill Density, Survival Time) are saved to `results/`.
+- [x] Checkpoint saved to `models/game1/final.pt`.
+- [x] Agents exhibit "Greedy Soldier" behavior (no coordination, pure aggression).
+- [x] Gameplay recorded to `results/game1_demo/`.
+
+### Baseline Numbers (Game 1)
+| Metric | Value |
+|--------|-------|
+| Mean episode return | 3.925 ± 3.91 |
+| Mean episode length | 386.4 steps |
+| Kill density | 0.0102 kills/step |
+| Entropy (final) | 1.48 |
+| Training SPS | ~366 |
 
 ---
 

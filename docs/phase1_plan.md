@@ -14,8 +14,8 @@ Train a Multi-Agent PPO (MAPPO) policy on the default PettingZoo Knights-Archers
 |----------|--------|
 | 1.1 | Install dependencies: `pettingzoo[butterfly]`, `supersuit`, `gymnasium`, `torch`, `tensorboard`, `stable-baselines3` (or custom PPO). Record versions in `requirements.txt`. |
 | 1.2 | Write `src/wrappers/kaz_wrapper.py` — a thin wrapper class that accepts a `game_level` argument (1–5). For Game 1 the wrapper is essentially a **pass-through** (no modifications). Design the constructor so Games 2–5 can toggle ammo, stamina, fog via flags. |
-| 1.3 | Write a small smoke-test script (`src/test_env.py`) that instantiates the wrapped env, runs 100 random-action steps, and prints observation shape, action space, and sample rewards. Run with `./venv/bin/python src/test_env.py`. |
-| 1.4 | Confirm CUDA availability inside the venv: `./venv/bin/python -c "import torch; print(torch.cuda.is_available())"`. |
+| 1.3 | Write a small smoke-test script (`src/test_env.py`) that instantiates the wrapped env, runs 100 random-action steps, and prints observation shape, action space, and sample rewards. Run with `./.venv/bin/python src/test_env.py`. |
+| 1.4 | Confirm CUDA availability inside the venv: `./.venv/bin/python -c "import torch; print(torch.cuda.is_available())"`. |
 
 **Artifacts:** `src/wrappers/__init__.py`, `src/wrappers/kaz_wrapper.py`, `src/test_env.py`, `requirements.txt`.
 
@@ -69,8 +69,8 @@ Train a Multi-Agent PPO (MAPPO) policy on the default PettingZoo Knights-Archers
 
 | Sub-step | Detail |
 |----------|--------|
-| 5.1 | Run training: `./venv/bin/python src/train.py --game_level 1 --total_timesteps 500000`. |
-| 5.2 | Monitor via TensorBoard: `./venv/bin/python -m tensorboard.main --logdir results/tensorboard/game1/ --port 6006`. |
+| 5.1 | Run training: `./.venv/bin/python src/train.py --game_level 1 --total_timesteps 500000`. |
+| 5.2 | Monitor via TensorBoard: `./.venv/bin/python -m tensorboard.main --logdir results/tensorboard/game1/ --port 6006`. |
 | 5.3 | After training, extract and save baseline metrics to `results/game1_baseline_metrics.json`: **mean kill density**, **mean survival time**, **episode reward curve**. |
 | 5.4 | Save final model to `models/game1/final.pt`. |
 
@@ -103,6 +103,6 @@ Train a Multi-Agent PPO (MAPPO) policy on the default PettingZoo Knights-Archers
 
 ## Execution Notes
 - All commands run from project root (`~/ADLProject2`) per `rules.md`.
-- All Python invocations use `./venv/bin/python`.
-- New pip packages → `./venv/bin/pip install <pkg>` → update `requirements.txt`.
+- All Python invocations use `./.venv/bin/python`.
+- New pip packages → `./.venv/bin/pip install <pkg>` → update `requirements.txt`.
 - Never delete `results/`, `models/`, or `ray_results/` without confirmation.

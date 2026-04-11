@@ -257,22 +257,28 @@ print(f'Transferred {transferred}, skipped {skipped}')
 
 ## Training
 
-### Full Training Command (Recommended: Transfer + Extended)
+### Full Training Command (Recommended: Transfer + 1.5M steps)
 ```bash
 ./.venv/bin/python src/train.py \
     --game_level 5 \
     --arch attention_gru \
     --transfer_from models/game4/final.pt \
-    --total_timesteps 750000 \
+    --total_timesteps 1500000 \
     --max_cycles 900
 ```
+
+**Why 1.5M (3× G1-G4):**
+- G5 has the most complex architecture (attention + GRU) with the most parameters
+- Fog adds noise that slows credit assignment — the agent needs more samples to learn through it
+- GRU temporal patterns require long rollout histories to develop
+- **There is no overfitting risk in RL** — every rollout generates fresh episodes. The only risk is entropy collapse, which we monitor in TensorBoard.
 
 ### Alternative: From Scratch (for ablation comparison)
 ```bash
 ./.venv/bin/python src/train.py \
     --game_level 5 \
     --arch attention_gru \
-    --total_timesteps 750000 \
+    --total_timesteps 1500000 \
     --max_cycles 900
 ```
 
@@ -284,39 +290,11 @@ print(f'Transferred {transferred}, skipped {skipped}')
 Key signals:
 - `reward/preservation` — should remain non-zero despite fog (team reward still works)
 - `reward/raw_kills` — critical: does kill rate hold or collapse under fog?
-- `policy/entropy` — should NOT drop below ~0.5 (would signal mode collapse)
+- `policy/entropy` — **the one thing to worry about.** Should stay above ~0.3. If it collapses to near-zero, the policy has locked in and more steps won't help.
 - `metrics/raw_kill_density` — north star: should track toward G4 stochastic (0.00361) or higher
 - `metrics/episode_length` — fog may shorten episodes initially; should recover as GRU learns
 
-**Estimated time:** ~30 min on RTX 5070 Ti (750K steps, attention_gru slightly slower than attention).
-
-### Retrain Escalation Protocol (750K → 1M)
-
-After the 750K training completes, run the full evaluation pipeline. **If the results are underwhelming**, retrain at 1M steps before finalizing.
-
-**Trigger conditions for retrain at 1M** (ANY of these):
-1. Deterministic kills still = 0 AND stochastic kill density ≤ G4 (0.00361)
-2. Entropy collapsed below 0.4 before 500K steps (premature convergence — model needed more room)
-3. Stochastic raw kills < 0.5 (worse than G3 — fog crushed the agent)
-4. Preservation reward ≈ 0 (team coordination broke down under fog)
-
-**If triggered:**
-```bash
-# Clean previous G5 artifacts
-rm -rf models/game5 results/tensorboard/game5
-
-# Retrain at 1M steps
-./.venv/bin/python src/train.py \
-    --game_level 5 \
-    --arch attention_gru \
-    --transfer_from models/game4/final.pt \
-    --total_timesteps 1000000 \
-    --max_cycles 900
-```
-
-**Estimated time for 1M:** ~40 min on RTX 5070 Ti.
-
-**If 1M also underwhelms:** The contingency plan at the bottom of this document activates — pivot the narrative to "penalty avoidance resilience."
+**Estimated time:** ~60 min on RTX 5070 Ti (1.5M steps).
 
 ---
 

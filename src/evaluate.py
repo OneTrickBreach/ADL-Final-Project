@@ -215,7 +215,8 @@ def evaluate(args):
         "raw_kill_density": float(np.mean(all_raw_kills) / max(np.mean(all_lengths), 1)),
         "kill_density": float(np.mean(all_aggression) / max(np.mean(all_lengths), 1)),
     }
-    out_path = f"results/game{game_level}_eval_results.json"
+    det_suffix = "_det" if args.deterministic else ""
+    out_path = f"results/game{game_level}_eval_results{det_suffix}.json"
     os.makedirs("results", exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)

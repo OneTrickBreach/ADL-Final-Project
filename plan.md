@@ -69,11 +69,15 @@ ADLProject2/
     * **Artifacts:** `models/game4/final.pt`, `results/game4_eval_results.json`, `results/game4_demo/`.
 * **Analysis:** `results/ablation_table.md`, `results/phase3_observations.md`.
 
-### Phase 4: Tactical Uncertainty (Game 5 - The Final Hero)
-* **Game 5 (+ Gaussian Fog):**
-    * **Wrapper:** Apply a Gaussian blur/noise to observations.
-    * **The "Fire Discipline" Peak:** Agents must integrate resource costs (G2/G3) and teammate safety (G4) with visual uncertainty.
-    * **Goal:** Explicit coordination and perimeter defense.
+### Phase 4: Tactical Uncertainty (Game 5 - The Final Hero) ✅
+* **Game 5 (+ Gaussian Fog + GRU Recurrence):**
+    * **Wrapper:** Gaussian noise (σ=0.3) applied to all observations per step.
+    * **Architecture:** EntityAttentionEncoder + GRUCell(256, 256) temporal memory. 825,481 params. Transfer loaded 26/26 tensors from G4.
+    * **Training:** 1,506,717 steps / 2,076 episodes on RTX 5070 Ti (~60 min).
+    * **Behavior:** The **"Fire Discipline."** GRU memory integrates noisy observations over time, allowing the policy mode to commit to attacks. Deterministic attack rate: **69.9%** (vs ~0% in G4). Both aggression (+0.0030 peak) and preservation (+0.0040 peak) positive simultaneously.
+    * **Key Result:** Deterministic passivity fully resolved. Shaped kill density +0.00165 (+27% vs G4 +0.00130) despite fog handicap.
+    * **Results:** Mean return +0.38 ± 0.31 (stoch) | +0.20 ± 0.19 (det) | Raw kill density 0.00299 | Kill density 0.00165 | Preservation +0.525 | Mean ep length 176 steps.
+    * **Artifacts:** `models/game5/final.pt`, `results/game5_eval_results.json`, `results/game5_eval_results_det.json`, `results/game5_demo/`, `results/final_ablation_table.md`, `results/phase4_observations.md`.
 
 ---
 
@@ -92,4 +96,4 @@ ADLProject2/
 2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
 3.  ~~**Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.~~ ✅ Done
 4.  ~~**Phase 3:** Train Game 4 (60/40 comrade healthcare + entity self-attention).~~ ✅ Done
-5.  **Phase 4:** Train Game 5 (Gaussian fog + GRU recurrence) — the Final Hero.
+5.  ~~**Phase 4:** Train Game 5 (Gaussian fog + GRU recurrence) — the Final Hero.~~ ✅ Done

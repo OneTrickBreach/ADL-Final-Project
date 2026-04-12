@@ -40,8 +40,12 @@ def parse_args():
                     help="Steps to collect per rollout before updating")
     p.add_argument("--hidden_dim", type=int, default=256)
     p.add_argument("--arch", type=str, default="mlp",
-                    choices=["mlp", "attention"],
-                    help="Network architecture: mlp (G1-G3), attention (G4+)")
+                    choices=["mlp", "attention", "attention_gru"],
+                    help="Network architecture: mlp (G1-G3), attention (G4), attention_gru (G5)")
+    p.add_argument("--transfer_from", type=str, default=None,
+                    help="Path to checkpoint to transfer weights from (e.g. G4 -> G5)")
+    p.add_argument("--min_entropy", type=float, default=None,
+                    help="Entropy floor: double ent_coef dynamically when entropy drops below this")
     p.add_argument("--num_entities", type=int, default=27,
                     help="Number of entity slots in observation (for attention arch)")
     p.add_argument("--entity_dim", type=int, default=5,
@@ -76,12 +80,14 @@ class RolloutBuffer:
         self.raw_kill_rewards = []
         self.aggression_rewards = []
         self.preservation_rewards = []
+        # GRU hidden states (stored as numpy arrays, None for non-GRU arches)
+        self.hidden_states = []
 
     def clear(self):
         self.__init__()
 
     def add(self, agent_id, obs, action, log_prob, reward, done, value,
-            raw_kill=0.0, aggression=0.0, preservation=0.0):
+            raw_kill=0.0, aggression=0.0, preservation=0.0, hidden=None):
         self.agent_ids.append(agent_id)
         self.obs.append(obs)
         self.actions.append(action)
@@ -92,6 +98,7 @@ class RolloutBuffer:
         self.raw_kill_rewards.append(raw_kill)
         self.aggression_rewards.append(aggression)
         self.preservation_rewards.append(preservation)
+        self.hidden_states.append(hidden)
 
     def compute_gae(self, last_values: dict, gamma: float, gae_lambda: float):
         """Compute GAE per-agent to avoid cross-agent contamination.
@@ -134,11 +141,18 @@ class RolloutBuffer:
         return advantages, returns
 
     def to_tensors(self, device):
-        return {
+        result = {
             "obs": torch.tensor(np.array(self.obs), dtype=torch.float32, device=device),
             "actions": torch.tensor(np.array(self.actions), dtype=torch.long, device=device),
             "log_probs": torch.tensor(np.array(self.log_probs), dtype=torch.float32, device=device),
         }
+        if self.hidden_states and self.hidden_states[0] is not None:
+            result["hidden_states"] = torch.tensor(
+                np.array(self.hidden_states), dtype=torch.float32, device=device
+            )
+        else:
+            result["hidden_states"] = None
+        return result
 
 
 # ── Training ─────────────────────────────────────────────────────────
@@ -179,6 +193,22 @@ def train(args):
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr, eps=1e-5)
     print(f"[train] Network params: {sum(p.numel() for p in net.parameters()):,}")
 
+    # Transfer weights from a prior checkpoint (e.g. G4 attention -> G5 attention_gru)
+    if args.transfer_from:
+        g_ckpt = torch.load(args.transfer_from, map_location=device, weights_only=False)
+        g_state = g_ckpt["model_state_dict"]
+        g5_state = net.state_dict()
+        transferred, skipped = 0, 0
+        for key in g_state:
+            if key in g5_state and g_state[key].shape == g5_state[key].shape:
+                g5_state[key] = g_state[key]
+                transferred += 1
+            else:
+                skipped += 1
+        net.load_state_dict(g5_state)
+        print(f"[train] Transferred {transferred} param tensors from {args.transfer_from} "
+              f"(skipped {skipped})")
+
     # TensorBoard (rules.md #9)
     log_dir = f"results/tensorboard/game{args.game_level}"
     os.makedirs(log_dir, exist_ok=True)
@@ -194,6 +224,10 @@ def train(args):
     episode_count = 0
     episode_returns = []       # track last N episode returns
     episode_lengths = []
+
+    # Per-agent GRU hidden states (None for non-GRU arches)
+    # Keyed by agent name; reset on episode boundaries
+    agent_hidden = {}
 
     # Running episode trackers
     ep_return = defaultdict(float)
@@ -240,6 +274,7 @@ def train(args):
                 ep_length = 0
                 obs_raw, _ = env.reset()
                 obs_flat = flatten_obs(obs_raw)
+                agent_hidden = {}  # reset GRU states on episode boundary
 
             # Get actions for all living agents
             with torch.no_grad():
@@ -248,7 +283,34 @@ def train(args):
                         obs_flat[agent], dtype=torch.float32, device=device
                     ).unsqueeze(0)
 
-                    action, log_prob, _, value, _ = net.get_action_and_value(obs_t)
+                    # Retrieve (or initialise) this agent's GRU hidden state
+                    h_np = agent_hidden.get(agent)  # shape (hidden_dim,) or None
+                    if h_np is not None:
+                        h_t = torch.tensor(
+                            h_np, dtype=torch.float32, device=device
+                        ).unsqueeze(0)  # (1, hidden_dim)
+                    else:
+                        h_t = None
+
+                    action, log_prob, _, value, _, new_hidden = net.get_action_and_value(
+                        obs_t, hidden=h_t
+                    )
+
+                    # Persist updated hidden state (detached)
+                    if new_hidden is not None:
+                        agent_hidden[agent] = (
+                            new_hidden.detach().cpu().numpy()[0]  # (hidden_dim,)
+                        )
+
+                    # For GRU arch: store zeros when agent has no prior hidden state
+                    # so that the buffer's hidden_states list stays homogeneous.
+                    if args.arch == "attention_gru":
+                        h_store = (
+                            h_np if h_np is not None
+                            else np.zeros(args.hidden_dim, dtype=np.float32)
+                        )
+                    else:
+                        h_store = None
 
                     buffer.add(
                         agent_id=agent,
@@ -258,6 +320,7 @@ def train(args):
                         reward=0.0,   # filled after step
                         done=False,
                         value=value.item(),
+                        hidden=h_store,
                     )
 
             # Step env
@@ -304,7 +367,12 @@ def train(args):
                     obs_t = torch.tensor(
                         obs_flat[agent], dtype=torch.float32, device=device
                     ).unsqueeze(0)
-                    _, _, _, v, _ = net.get_action_and_value(obs_t)
+                    h_np = agent_hidden.get(agent)
+                    h_t = (
+                        torch.tensor(h_np, dtype=torch.float32, device=device).unsqueeze(0)
+                        if h_np is not None else None
+                    )
+                    _, _, _, v, _, _ = net.get_action_and_value(obs_t, hidden=h_t)
                     last_values[agent] = v.item()
 
         advantages, returns = buffer.compute_gae(last_values, args.gamma, args.gae_lambda)
@@ -314,6 +382,7 @@ def train(args):
         all_obs = tensors["obs"]
         all_actions = tensors["actions"]
         all_old_log_probs = tensors["log_probs"]
+        all_hidden = tensors["hidden_states"]  # (N, hidden_dim) or None
         all_returns = torch.tensor(returns, dtype=torch.float32, device=device)
         all_advantages = torch.tensor(advantages, dtype=torch.float32, device=device)
 
@@ -336,9 +405,12 @@ def train(args):
                 mb_old_lp = all_old_log_probs[mb_idx_t]
                 mb_returns = all_returns[mb_idx_t]
                 mb_advantages = all_advantages[mb_idx_t]
+                mb_hidden = (
+                    all_hidden[mb_idx_t].detach() if all_hidden is not None else None
+                )
 
-                _, new_lp, entropy, new_val, _ = net.get_action_and_value(
-                    mb_obs, mb_actions
+                _, new_lp, entropy, new_val, _, _ = net.get_action_and_value(
+                    mb_obs, mb_actions, mb_hidden
                 )
 
                 # Policy loss (clipped)
@@ -354,9 +426,14 @@ def train(args):
                 # Entropy bonus
                 entropy_loss = -entropy.mean()
 
+                # Entropy floor: double ent_coef if entropy collapses below threshold
+                eff_ent_coef = args.ent_coef
+                if args.min_entropy is not None and entropy.mean().item() < args.min_entropy:
+                    eff_ent_coef = args.ent_coef * 2.0
+
                 loss = (policy_loss
                         + args.vf_coef * value_loss
-                        + args.ent_coef * entropy_loss)
+                        + eff_ent_coef * entropy_loss)
 
                 optimizer.zero_grad()
                 loss.backward()

@@ -26,10 +26,12 @@ import torch
 
 sys.path.insert(0, ".")
 from src.models.mappo_net import MAPPONet
+from src.utils import get_device, device_info
 from src.wrappers.kaz_wrapper import KAZWrapper
 
 os.makedirs("results", exist_ok=True)
-DEVICE = torch.device("cuda")
+DEVICE = get_device()
+print(f"[phase5] Device: {device_info(DEVICE)}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

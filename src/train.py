@@ -22,6 +22,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 sys.path.insert(0, ".")
 from src.models.mappo_net import MAPPONet
+from src.utils import get_device, device_info
 from src.wrappers.kaz_wrapper import KAZWrapper
 
 
@@ -165,10 +166,11 @@ def train(args):
     # Seeding
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    torch.cuda.manual_seed_all(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
 
-    device = torch.device("cuda")
-    print(f"[train] Device: {device} ({torch.cuda.get_device_name(0)})")
+    device = get_device()
+    print(f"[train] Device: {device_info(device)}")
     print(f"[train] Game level: {args.game_level}, arch: {args.arch}")
 
     # Environment

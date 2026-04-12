@@ -6,7 +6,7 @@ Architecture:
   Value head also outputs reward decomposition estimates (aggression, preservation)
   for TensorBoard interpretability logging.
 
-Designed for KAZ vector observations of shape (N, obs_dim) where obs_dim = 27*5 = 135.
+Designed for KAZ vector observations of shape (N, obs_dim) where obs_dim = num_entities * entity_dim.
 
 Supported architectures:
   'mlp'           — 2-layer MLP backbone (G1–G3)
@@ -162,7 +162,7 @@ class MAPPONet(nn.Module):
     def forward(self, obs: torch.Tensor, hidden: torch.Tensor = None):
         """
         Args:
-            obs:    (batch, obs_dim) float tensor on CUDA.
+            obs:    (batch, obs_dim) float tensor on the model's device.
             hidden: (batch, hidden_dim) GRU hidden state — only used for
                     'attention_gru' arch; ignored (and returned as None) otherwise.
 

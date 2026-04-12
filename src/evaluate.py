@@ -17,6 +17,7 @@ import torch
 
 sys.path.insert(0, ".")
 from src.models.mappo_net import MAPPONet
+from src.utils import get_device, device_info
 from src.wrappers.kaz_wrapper import KAZWrapper
 
 
@@ -39,7 +40,7 @@ def flatten_obs(obs_dict):
 
 
 def evaluate(args):
-    device = torch.device("cuda")
+    device = get_device()
 
     # Load checkpoint
     ckpt = torch.load(args.checkpoint, map_location=device, weights_only=False)
@@ -51,6 +52,7 @@ def evaluate(args):
     entity_dim = train_args.get("entity_dim", 5)
     num_heads = train_args.get("num_heads", 4)
 
+    print(f"[eval] Device: {device_info(device)}")
     print(f"[eval] Checkpoint: {args.checkpoint}")
     print(f"[eval] Game level: {game_level}, arch: {arch}, trained for {ckpt['global_step']} steps")
 

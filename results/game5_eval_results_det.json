@@ -1,0 +1,14 @@
+{
+  "checkpoint": "models/game5/final.pt",
+  "game_level": 5,
+  "episodes": 10,
+  "deterministic": true,
+  "mean_return": 0.20494999999999997,
+  "std_return": 0.19121564397297622,
+  "mean_raw_kills": 0.275,
+  "mean_aggression": 0.15824999999999997,
+  "mean_preservation": 0.275,
+  "mean_episode_length": 169.0,
+  "raw_kill_density": 0.0016272189349112428,
+  "kill_density": 0.0009363905325443785
+}

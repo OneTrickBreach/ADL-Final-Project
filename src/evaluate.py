@@ -104,6 +104,8 @@ def evaluate(args):
         ep_pres = defaultdict(float)
         ep_len = 0
         frames = []
+        # Per-agent GRU hidden states; reset each episode
+        ep_hidden = {}
 
         if args.record:
             frame = env.render()
@@ -117,11 +119,27 @@ def evaluate(args):
                     obs_t = torch.tensor(
                         obs_flat[agent], dtype=torch.float32, device=device
                     ).unsqueeze(0)
+
+                    # Retrieve (or zero-init) GRU hidden state
+                    h_np = ep_hidden.get(agent)
+                    h_t = (
+                        torch.tensor(h_np, dtype=torch.float32, device=device).unsqueeze(0)
+                        if h_np is not None else None
+                    )
+
                     if args.deterministic:
-                        out = net.forward(obs_t)
+                        out = net.forward(obs_t, hidden=h_t)
                         action = out["logits"].argmax(dim=-1)
+                        new_hidden = out["hidden"]
                     else:
-                        action, _, _, _, _ = net.get_action_and_value(obs_t)
+                        action, _, _, _, _, new_hidden = net.get_action_and_value(
+                            obs_t, hidden=h_t
+                        )
+
+                    # Persist updated GRU state (detached)
+                    if new_hidden is not None:
+                        ep_hidden[agent] = new_hidden.detach().cpu().numpy()[0]
+
                     actions[agent] = action.item()
 
             obs_raw, rewards, terms, truncs, infos = env.step(actions)

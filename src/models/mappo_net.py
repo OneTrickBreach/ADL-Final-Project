@@ -7,6 +7,11 @@ Architecture:
   for TensorBoard interpretability logging.
 
 Designed for KAZ vector observations of shape (N, obs_dim) where obs_dim = 27*5 = 135.
+
+Supported architectures:
+  'mlp'           — 2-layer MLP backbone (G1–G3)
+  'attention'     — entity self-attention encoder (G4)
+  'attention_gru' — attention encoder + GRUCell temporal memory (G5)
 """
 
 import torch
@@ -69,11 +74,12 @@ class MAPPONet(nn.Module):
     """Shared-parameter actor-critic network for MAPPO.
 
     Supports multiple encoder architectures:
-      'mlp'       — standard 2-layer MLP backbone (G1–G3)
-      'attention'  — entity self-attention encoder (G4+)
+      'mlp'           — standard 2-layer MLP backbone (G1–G3)
+      'attention'     — entity self-attention encoder (G4)
+      'attention_gru' — attention + GRUCell temporal memory (G5)
     """
 
-    ARCH_CHOICES = ("mlp", "attention")
+    ARCH_CHOICES = ("mlp", "attention", "attention_gru")
 
     def __init__(self, obs_dim: int, act_dim: int, hidden_dim: int = 256,
                  arch: str = "mlp",
@@ -83,6 +89,7 @@ class MAPPONet(nn.Module):
         self.obs_dim = obs_dim
         self.act_dim = act_dim
         self.arch = arch
+        self.hidden_dim = hidden_dim
 
         # ── Encoder ──────────────────────────────────────────
         if arch == "mlp":
@@ -96,6 +103,16 @@ class MAPPONet(nn.Module):
             self.entity_attention = EntityAttentionEncoder(
                 entity_dim, num_entities, hidden_dim, num_heads,
             )
+            self.backbone = nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+            )
+        elif arch == "attention_gru":
+            self.entity_attention = EntityAttentionEncoder(
+                entity_dim, num_entities, hidden_dim, num_heads,
+            )
+            # GRUCell processes one timestep at a time during rollout
+            self.gru = nn.GRUCell(hidden_dim, hidden_dim)
             self.backbone = nn.Sequential(
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.ReLU(),
@@ -142,23 +159,35 @@ class MAPPONet(nn.Module):
         # Smaller init for value output
         nn.init.orthogonal_(self.value_head[-1].weight, gain=1.0)
 
-    def forward(self, obs: torch.Tensor):
+    def forward(self, obs: torch.Tensor, hidden: torch.Tensor = None):
         """
         Args:
-            obs: (batch, obs_dim) float tensor on CUDA.
+            obs:    (batch, obs_dim) float tensor on CUDA.
+            hidden: (batch, hidden_dim) GRU hidden state — only used for
+                    'attention_gru' arch; ignored (and returned as None) otherwise.
 
         Returns:
             dict with keys:
                 "logits":       (batch, act_dim) — raw action logits
                 "value":        (batch, 1)       — state-value estimate
+                "hidden":       (batch, hidden_dim) new GRU state, or None
                 "reward_decomposition": {
                     "aggression":   (batch, 1),
                     "preservation": (batch, 1),
                 }
         """
+        new_hidden = None
         if self.arch == "attention":
             attn_out = self.entity_attention(obs)
             features = self.backbone(attn_out)
+        elif self.arch == "attention_gru":
+            attn_out = self.entity_attention(obs)
+            if hidden is None:
+                hidden = torch.zeros(
+                    obs.shape[0], self.hidden_dim, device=obs.device, dtype=obs.dtype
+                )
+            new_hidden = self.gru(attn_out, hidden)
+            features = self.backbone(new_hidden)
         else:
             features = self.backbone(obs)
         logits = self.policy_head(features)
@@ -170,21 +199,29 @@ class MAPPONet(nn.Module):
         return {
             "logits": logits,
             "value": value,
+            "hidden": new_hidden,
             "reward_decomposition": reward_decomposition,
         }
 
-    def get_action_and_value(self, obs: torch.Tensor, action: torch.Tensor = None):
+    def get_action_and_value(
+        self,
+        obs: torch.Tensor,
+        action: torch.Tensor = None,
+        hidden: torch.Tensor = None,
+    ):
         """
         Convenience method for PPO rollout/update.
 
         Args:
             obs:    (batch, obs_dim)
             action: (batch,) optional — if None, sample from policy.
+            hidden: (batch, hidden_dim) optional GRU hidden state.
 
         Returns:
-            action, log_prob, entropy, value, reward_decomposition
+            action, log_prob, entropy, value, reward_decomposition, new_hidden
+            For non-GRU arches, new_hidden is None.
         """
-        out = self.forward(obs)
+        out = self.forward(obs, hidden=hidden)
         dist = Categorical(logits=out["logits"])
 
         if action is None:
@@ -196,5 +233,6 @@ class MAPPONet(nn.Module):
         reward_decomposition = {
             k: v.squeeze(-1) for k, v in out["reward_decomposition"].items()
         }
+        new_hidden = out["hidden"]
 
-        return action, log_prob, entropy, value, reward_decomposition
+        return action, log_prob, entropy, value, reward_decomposition, new_hidden

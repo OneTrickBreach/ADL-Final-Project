@@ -81,13 +81,15 @@ ADLProject2/
 
 ---
 
-### Phase 5: Evaluation & Explainability
+### Phase 5: Evaluation & Explainability ✅
 1.  **Quantitative:**
-    * **Ablation Table:** A table comparing Kills/Resource Ratio across all 5 Games.
-    * **The "Collapse" Graph:** Show how Game 1 fails at 1.5x zombie density while Game 5 survives via efficiency.
+    * **Ablation Table:** ✅ `results/final_ablation_table.md` — G1–G5 kill density, preservation, action distribution, constraint stack.
+    * **The "Collapse" Graph:** ✅ `results/collapse_graph.png` — G1 vs G5 at 4 spawn-pressure levels (0.7x→2.0x). G5 degrades more gracefully.
+    * **Kill Density Evolution:** ✅ `results/kill_density_evolution.png` — Bar chart of behavioral trajectory + team reward signal.
 2.  **Qualitative (The "Explain" Box):**
-    * **Saliency Maps:** Show Game 1 attending only to the "Nearest Enemy" vs. Game 5 attending to the "Teammate + Fog Border."
-    * **Video Demo:** Side-by-side of the "Greedy Soldier" vs. the "Tactical Unit."
+    * **Saliency Maps:** ✅ `results/saliency_comparison.png` — G1 gradient saliency (narrow, enemy-focused) vs G5 attention weights (distributed, includes teammate slots) + full attention heatmap.
+    * **Video Demo:** ✅ `results/demo_sidebyside.mp4` — 900-frame side-by-side: G1 "Greedy Soldier" vs G5 "Fire Discipline" (30s @ 30fps).
+    * **Script:** `src/phase5.py`
 
 ---
 

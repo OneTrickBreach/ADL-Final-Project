@@ -42,7 +42,9 @@ def load_net(ckpt_path):
     ckpt = torch.load(ckpt_path, map_location=DEVICE, weights_only=False)
     ta = ckpt["args"]
     # Derive obs_dim from the training environment so it's always correct
-    _env = KAZWrapper(game_level=ta["game_level"], vector_state=True)
+    death_penalty = ta.get("death_penalty", 0.0)
+    _env = KAZWrapper(game_level=ta["game_level"], vector_state=True,
+                      death_penalty=death_penalty)
     _obs, _ = _env.reset()
     obs_dim = list(_obs.values())[0].flatten().shape[0]
     act_dim = _env.action_space(_env.agents[0]).n
@@ -58,6 +60,7 @@ def load_net(ckpt_path):
     net.load_state_dict(ckpt["model_state_dict"])
     net.eval()
     ta["_obs_dim"] = obs_dim  # cache for later use
+    ta["_death_penalty"] = death_penalty  # cache for downstream callers
     return net, ta
 
 
@@ -66,10 +69,11 @@ def flatten(obs_dict):
 
 
 def run_episodes(net, game_level, episodes=5, spawn_rate=20,
-                 seed=42, deterministic=True):
+                 seed=42, deterministic=True, death_penalty=0.0):
     """Return list of (raw_kills, ep_len) per episode."""
     env = KAZWrapper(game_level=game_level, vector_state=True,
-                     spawn_rate=spawn_rate, seed=seed)
+                     spawn_rate=spawn_rate, seed=seed,
+                     death_penalty=death_penalty)
     results = []
     ep_hidden = {}
     for _ in range(episodes):
@@ -182,8 +186,10 @@ def part1_kill_density_evolution():
 
 def part2_collapse_graph():
     print("[phase5] Part 2: Stress-test / collapse graph...")
-    net_g1, _ = load_net("models/game1/final.pt")
-    net_g5, _ = load_net("models/game5/final.pt")
+    net_g1, ta_g1 = load_net("models/game1/final.pt")
+    net_g5, ta_g5 = load_net("models/game5/final.pt")
+    dp_g1 = ta_g1.get("_death_penalty", 0.0)
+    dp_g5 = ta_g5.get("_death_penalty", 0.0)
 
     # Stress via spawn_rate: lower = faster zombie spawning = harder
     # 20=normal(training), 14=1.5x pressure, 10=2x pressure, 7=3x pressure
@@ -197,9 +203,9 @@ def part2_collapse_graph():
     for sr in spawn_rates:
         print(f"  spawn_rate={sr}...")
         r1 = run_episodes(net_g1, game_level=1, episodes=episodes_per_rate,
-                          spawn_rate=sr, seed=77)
+                          spawn_rate=sr, seed=77, death_penalty=dp_g1)
         r5 = run_episodes(net_g5, game_level=5, episodes=episodes_per_rate,
-                          spawn_rate=sr, seed=77)
+                          spawn_rate=sr, seed=77, death_penalty=dp_g5)
         g1_kills.append(np.mean([k for k, _ in r1]))
         g1_lens.append(np.mean([l for _, l in r1]))
         g5_kills.append(np.mean([k for k, _ in r5]))
@@ -277,7 +283,8 @@ def part3_saliency():
 
     # ── G1: gradient-based saliency ──────────────────────────────────────
     g1_saliency = np.zeros(g1_entities)
-    env = KAZWrapper(game_level=1, vector_state=True, seed=11)
+    env = KAZWrapper(game_level=1, vector_state=True, seed=11,
+                      death_penalty=ta_g1.get("_death_penalty", 0.0))
     obs_raw, _ = env.reset()
     obs_flat = flatten(obs_raw)
     step_count = 0
@@ -325,7 +332,8 @@ def part3_saliency():
 
     handle = net_g5.entity_attention.attention.register_forward_hook(attn_hook)
 
-    env5 = KAZWrapper(game_level=5, vector_state=True, seed=11)
+    env5 = KAZWrapper(game_level=5, vector_state=True, seed=11,
+                       death_penalty=ta_g5.get("_death_penalty", 0.0))
     obs_raw, _ = env5.reset()
     obs_flat5 = flatten(obs_raw)
     ep_hidden5 = {}
@@ -444,8 +452,8 @@ def part3_saliency():
 def part4_sidebyside():
     print("[phase5] Part 4: Side-by-side demo video...")
 
-    net_g1, _ = load_net("models/game1/final.pt")
-    net_g5, _ = load_net("models/game5/final.pt")
+    net_g1, ta_g1 = load_net("models/game1/final.pt")
+    net_g5, ta_g5 = load_net("models/game5/final.pt")
 
     SEED = 55
     MAX_FRAMES = 900
@@ -453,10 +461,14 @@ def part4_sidebyside():
     EPISODES = 3
     LABEL_H = 60
 
+    dp_g1 = ta_g1.get("_death_penalty", 0.0)
+    dp_g5 = ta_g5.get("_death_penalty", 0.0)
     env_g1 = KAZWrapper(game_level=1, vector_state=True,
-                        render_mode="rgb_array", seed=SEED)
+                        render_mode="rgb_array", seed=SEED,
+                        death_penalty=dp_g1)
     env_g5 = KAZWrapper(game_level=5, vector_state=True,
-                        render_mode="rgb_array", seed=SEED)
+                        render_mode="rgb_array", seed=SEED,
+                        death_penalty=dp_g5)
 
     all_frames = []
     total_frames = 0

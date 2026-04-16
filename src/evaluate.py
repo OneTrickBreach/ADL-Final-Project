@@ -52,7 +52,10 @@ def evaluate(args):
     entity_dim = train_args.get("entity_dim", 5)
     num_heads = train_args.get("num_heads", 4)
 
+    death_penalty = train_args.get("death_penalty", 0.0)
+
     print(f"[eval] Device: {device_info(device)}")
+    print(f"[eval] Death penalty: {death_penalty}")
     print(f"[eval] Checkpoint: {args.checkpoint}")
     print(f"[eval] Game level: {game_level}, arch: {arch}, trained for {ckpt['global_step']} steps")
 
@@ -68,6 +71,7 @@ def evaluate(args):
         vector_state=True,
         render_mode=render_mode,
         seed=args.seed,
+        death_penalty=death_penalty,
     )
 
     # Recording setup
@@ -96,6 +100,7 @@ def evaluate(args):
     all_raw_kills = []
     all_aggression = []
     all_preservation = []
+    all_death = []
 
     for ep in range(args.episodes):
         obs_raw, _ = env.reset()
@@ -104,6 +109,7 @@ def evaluate(args):
         ep_aggr = defaultdict(float)
         ep_raw_kills = defaultdict(float)
         ep_pres = defaultdict(float)
+        ep_death = defaultdict(float)
         ep_len = 0
         frames = []
         # Per-agent GRU hidden states; reset each episode
@@ -158,17 +164,20 @@ def evaluate(args):
                 ep_raw_kills[agent] += ri.get("raw_kill", 0.0)
                 ep_aggr[agent] += ri.get("aggression", 0.0)
                 ep_pres[agent] += ri.get("preservation", 0.0)
+                ep_death[agent] += ri.get("death_penalty", 0.0)
             ep_len += 1
 
         mean_ret = float(np.mean(list(ep_return.values())))
         mean_raw_k = float(np.mean(list(ep_raw_kills.values())))
         mean_aggr = float(np.mean(list(ep_aggr.values())))
         mean_pres = float(np.mean(list(ep_pres.values())))
+        mean_death = float(np.mean(list(ep_death.values()))) if ep_death else 0.0
         all_returns.append(mean_ret)
         all_lengths.append(ep_len)
         all_raw_kills.append(mean_raw_k)
         all_aggression.append(mean_aggr)
         all_preservation.append(mean_pres)
+        all_death.append(mean_death)
 
         # Save video if recording
         if args.record and frames:
@@ -216,6 +225,7 @@ def evaluate(args):
         "mean_episode_length": float(np.mean(all_lengths)),
         "raw_kill_density": float(np.mean(all_raw_kills) / max(np.mean(all_lengths), 1)),
         "kill_density": float(np.mean(all_aggression) / max(np.mean(all_lengths), 1)),
+        "mean_death_penalty": float(np.mean(all_death)),
     }
     det_suffix = "_det" if args.deterministic else ""
     out_path = f"results/game{game_level}_eval_results{det_suffix}.json"

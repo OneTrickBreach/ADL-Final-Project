@@ -62,6 +62,8 @@ def parse_args():
     p.add_argument("--save_interval", type=int, default=20,
                     help="Save checkpoint every N rollout updates")
     p.add_argument("--max_cycles", type=int, default=900)
+    p.add_argument("--death_penalty", type=float, default=2.0,
+                    help="Penalty applied when an agent dies (0 = disabled)")
     return p.parse_args()
 
 
@@ -81,6 +83,7 @@ class RolloutBuffer:
         self.raw_kill_rewards = []
         self.aggression_rewards = []
         self.preservation_rewards = []
+        self.death_penalty_rewards = []
         # GRU hidden states (stored as numpy arrays, None for non-GRU arches)
         self.hidden_states = []
 
@@ -88,7 +91,7 @@ class RolloutBuffer:
         self.__init__()
 
     def add(self, agent_id, obs, action, log_prob, reward, done, value,
-            raw_kill=0.0, aggression=0.0, preservation=0.0, hidden=None):
+            raw_kill=0.0, aggression=0.0, preservation=0.0, death_penalty=0.0, hidden=None):
         self.agent_ids.append(agent_id)
         self.obs.append(obs)
         self.actions.append(action)
@@ -99,6 +102,7 @@ class RolloutBuffer:
         self.raw_kill_rewards.append(raw_kill)
         self.aggression_rewards.append(aggression)
         self.preservation_rewards.append(preservation)
+        self.death_penalty_rewards.append(death_penalty)
         self.hidden_states.append(hidden)
 
     def compute_gae(self, last_values: dict, gamma: float, gae_lambda: float):
@@ -172,6 +176,7 @@ def train(args):
     device = get_device()
     print(f"[train] Device: {device_info(device)}")
     print(f"[train] Game level: {args.game_level}, arch: {args.arch}")
+    print(f"[train] Death penalty: {args.death_penalty}")
 
     # Environment
     env = KAZWrapper(
@@ -179,6 +184,7 @@ def train(args):
         max_cycles=args.max_cycles,
         vector_state=True,
         seed=args.seed,
+        death_penalty=args.death_penalty,
     )
     obs_raw, _ = env.reset()
     obs_flat = flatten_obs(obs_raw)
@@ -236,6 +242,7 @@ def train(args):
     ep_raw_kills = defaultdict(float)
     ep_aggression = defaultdict(float)
     ep_preservation = defaultdict(float)
+    ep_death_penalty = defaultdict(float)
     ep_length = 0
 
     obs_raw, _ = env.reset()
@@ -249,6 +256,7 @@ def train(args):
         rollout_raw_kills = []
         rollout_aggression = []
         rollout_preservation = []
+        rollout_death = []
 
         # ── Collect rollout ──────────────────────────────────
         for _ in range(args.rollout_steps):
@@ -268,11 +276,15 @@ def train(args):
                 rollout_preservation.append(
                     float(np.mean(list(ep_preservation.values()))) if ep_preservation else 0.0
                 )
+                rollout_death.append(
+                    float(np.mean(list(ep_death_penalty.values()))) if ep_death_penalty else 0.0
+                )
                 episode_count += 1
                 ep_return = defaultdict(float)
                 ep_raw_kills = defaultdict(float)
                 ep_aggression = defaultdict(float)
                 ep_preservation = defaultdict(float)
+                ep_death_penalty = defaultdict(float)
                 ep_length = 0
                 obs_raw, _ = env.reset()
                 obs_flat = flatten_obs(obs_raw)
@@ -343,6 +355,7 @@ def train(args):
                 raw_k = ri.get("raw_kill", 0.0)
                 aggr = ri.get("aggression", 0.0)
                 pres = ri.get("preservation", 0.0)
+                dp = ri.get("death_penalty", 0.0)
                 total = ri.get("total", rewards[agent])
                 done = terms.get(agent, False) or truncs.get(agent, False)
 
@@ -352,11 +365,13 @@ def train(args):
                 buffer.raw_kill_rewards[buf_idx] = raw_k
                 buffer.aggression_rewards[buf_idx] = aggr
                 buffer.preservation_rewards[buf_idx] = pres
+                buffer.death_penalty_rewards[buf_idx] = dp
 
                 ep_return[agent] += total
                 ep_raw_kills[agent] += raw_k
                 ep_aggression[agent] += aggr
                 ep_preservation[agent] += pres
+                ep_death_penalty[agent] += dp
 
             ep_length += 1
             global_step += len(rewards)
@@ -467,7 +482,9 @@ def train(args):
             writer.add_scalar("reward/total", avg_reward, global_step)
             writer.add_scalar("reward/raw_kills", avg_raw_kills, global_step)
             writer.add_scalar("reward/aggression", avg_aggression, global_step)
+            avg_death_penalty = float(np.mean(buffer.death_penalty_rewards))
             writer.add_scalar("reward/preservation", avg_preservation, global_step)
+            writer.add_scalar("reward/death_penalty", avg_death_penalty, global_step)
             writer.add_scalar("policy/loss", avg_policy_loss, global_step)
             writer.add_scalar("policy/entropy", avg_entropy, global_step)
             writer.add_scalar("value/loss", avg_value_loss, global_step)

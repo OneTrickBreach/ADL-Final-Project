@@ -37,6 +37,7 @@ class KAZWrapper:
         vector_state: bool = True,
         render_mode: str | None = None,
         seed: int | None = None,
+        death_penalty: float = 0.0,
     ):
         assert 1 <= game_level <= 5, f"game_level must be 1-5, got {game_level}"
         self.game_level = game_level
@@ -64,6 +65,9 @@ class KAZWrapper:
         self.stamina_cost_move = 0.01   # cost per movement action
         self.stamina_cost_attack = 0.05 # cost per sword swing
         self.agent_stamina = {}         # runtime stamina counters
+
+        # === Death penalty ===
+        self.death_penalty = death_penalty
 
         # === Fog system (Game 5) ===
         self.fog_sigma = 3.0  # Gaussian blur sigma
@@ -176,6 +180,12 @@ class KAZWrapper:
                 self.weight_self * reward_aggression
                 + self.weight_team * reward_preservation
             )
+            # Death penalty — applied when agent is terminated
+            death_cost = 0.0
+            if self.death_penalty > 0 and terminations.get(agent, False):
+                death_cost = self.death_penalty
+                total_reward -= death_cost
+
             shaped_rewards[agent] = total_reward
 
             # Attach decomposition for TensorBoard logging
@@ -185,6 +195,7 @@ class KAZWrapper:
                 "raw_kill": float(raw_rewards[agent]),
                 "aggression": reward_aggression,
                 "preservation": reward_preservation,
+                "death_penalty": -death_cost,
                 "total": total_reward,
             }
 

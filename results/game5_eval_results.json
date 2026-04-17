@@ -3,12 +3,13 @@
   "game_level": 5,
   "episodes": 10,
   "deterministic": false,
-  "mean_return": 0.3839999999999999,
-  "std_return": 0.3135327734065451,
-  "mean_raw_kills": 0.525,
-  "mean_aggression": 0.2899999999999999,
-  "mean_preservation": 0.525,
-  "mean_episode_length": 175.7,
-  "raw_kill_density": 0.0029880478087649406,
-  "kill_density": 0.0016505406943653953
+  "mean_return": -2.0714,
+  "std_return": 0.37511890115002205,
+  "mean_raw_kills": 0.675,
+  "mean_aggression": -0.5690000000000005,
+  "mean_preservation": 0.675,
+  "mean_episode_length": 181.0,
+  "raw_kill_density": 0.0037292817679558015,
+  "kill_density": -0.003143646408839782,
+  "mean_death_penalty": -2.0
 }

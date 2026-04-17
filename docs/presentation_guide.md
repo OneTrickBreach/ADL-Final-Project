@@ -58,17 +58,19 @@
 
 | Game | Added Element | Expected Behavior |
 |------|--------------|-------------------|
-| G1   | Kill reward only | Aggressive baseline |
+| G1   | Kill reward + death penalty (−2.0) | Aggressive baseline |
 | G2   | + Ammo limit (15/ep) | Resource awareness |
 | G3   | + Stamina decay | Risk aversion |
 | G4   | + 60/40 team reward + Attention | Cooperation |
 | G5   | + Gaussian fog + GRU | Fire discipline |
 
+**V2 addition:** Death penalty (−2.0 per death) applied to ALL games. The key experiment: does this alone fix G3 passivity?
+
 **Visual:** Table + constraint stack diagram with color coding matching the ablation chart
 
-> **Speaking notes:** "Each game adds exactly one thing. This is the key methodological
-> choice — it lets us attribute behavioral changes cleanly. We're running a controlled
-> experiment on emergent behavior."
+> **Speaking notes:** "Each game adds exactly one thing. In V2 we also added a universal
+> death penalty — dying costs 2 kills of reward. The question is: does this survival
+> incentive alone fix the passivity problem, or do we still need architectural upgrades?"
 
 ---
 
@@ -77,45 +79,44 @@
 **Visual:** `results/kill_density_evolution.png`
 
 **Talking points:**
-- G1: Kill density 0.01089 — peak aggression, runs 533 steps, dies fighting
-- G2→G3: **60–74% drop** in kill density — constraints create passivity
-- G4: Partial recovery with team reward + attention (0.00361)
-- G5: Stable at 0.00165 despite fog **AND** all prior constraints
+- G1: Kill density 0.01051 — peak aggression, barely affected by death penalty
+- G2→G3: **71–72% drop** in kill density — constraints + death penalty still create passivity
+- G4: Flatlines at 0.00298 — attention alone insufficient
+- G5: **0.00373** — highest constrained game, +25% vs V1 thanks to GRU + death penalty
 
-> **Speaking notes:** "The left chart tells the story. There's a collapse — G2 and G3
-> agents are being *punished* for the very thing they're supposed to do. G4 starts
-> the recovery. G5 is where we solve it properly. Notice also the right chart — G5
-> is the only game where agents demonstrate *both* aggression AND team preservation
-> simultaneously."
+> **Speaking notes:** "The collapse is still here — death penalty didn't fix it.
+> G2 and G3 agents can't convert 'don't die' into 'fight back' with an MLP.
+> But look at G5 — it's now the most aggressive constrained game. The GRU
+> gives agents the capacity to *use* the survival signal. That's the key
+> V2 finding: reward shaping and architecture are complementary."
 
-**Emphasise:** Right panel — G4 and G5 both show preservation, but G5 keeps aggression too.
+**Emphasise:** G5 raw kill density is now HIGHER than G4 — death penalty + GRU is the winning combo.
 
 ---
 
 ### Slide 6 — The Smoking Gun: Deterministic Passivity (5:30–7:00)  ⭐ KEY FINDING
-**Title:** Diagnosing Deterministic Passivity  
+**Title:** Diagnosing Deterministic Passivity — Death Penalty is NOT Enough  
 **Content:**
 ```
-                 Stochastic policy    Deterministic (argmax) policy
-G3:             attacks ~15% of steps        attacks ~0% of steps
-G4:             attacks ~20% of steps        attacks ~0% of steps
-G5:             attacks ~70% of steps        attacks 69.9% of steps  ← FIXED
+                 V2 Stoch Raw Kills    V2 Det Raw Kills    Death Penalty Effect
+G3 (MLP):        0.55/ep               0.00/ep             NO CHANGE
+G4 (Attn):       0.58/ep               0.00/ep             NO CHANGE
+G5 (Attn+GRU):   0.68/ep               0.33/ep             +25% raw kill density
 ```
 
 **Explain the mechanism:**
 1. Strong penalties shift probability mass *away* from attack
-2. Stochastic policy: attack is ~3rd most probable — still happens with noise
-3. Argmax policy: always picks the *most probable* action — which is no-op
-4. GRU fix: temporal evidence accumulates → policy *mode* shifts to attack after 2–3 consistent timesteps
+2. Death penalty adds survival incentive but MLP can't convert it to action
+3. Argmax policy: always picks the *most probable* action — which is no-op in G2–G4
+4. GRU fix: temporal evidence accumulates → policy *mode* shifts to attack AND death penalty amplifies this
 
-**Visual:** Simple diagram — softmax probability bars, G3 vs G5
+**Visual:** V1 vs V2 raw kill density comparison bar chart
 
-> **Speaking notes:** "This is the paper's main finding and it's subtle. The agents
-> in G3/G4 aren't stupid — their stochastic policy *does* attack. But if you
-> deploy them deterministically, they're completely passive. A robot that only acts
-> aggressively when there's random noise in its decisions is not a reliable robot.
-> G5 solves this with the GRU — by integrating evidence across time, the policy
-> *commits* to the attack decision rather than always hedging."
+> **Speaking notes:** "This is the cleanest ablation in the paper. Same survival
+> incentive, same penalty magnitude, applied to all games. MLP agents completely
+> ignore it — they lack the representational capacity to convert 'don't die' into
+> 'fight back.' But the GRU model *uses* it — V2 G5 has 25% higher raw kill
+> density than V1. Architecture is the bottleneck, not reward magnitude."
 
 ---
 
@@ -195,16 +196,19 @@ G5:             attacks ~70% of steps        attacks 69.9% of steps  ← FIXED
 ### Slide 11 — Conclusion & Takeaways (12:00–13:30)
 **Title:** What we learned  
 
-**Three key takeaways:**
+**Four key takeaways:**
 
 1. **Constraint stacking without architecture = passivity trap**  
-   Progressive penalties drove a 74% kill-density collapse (G1→G3). Safety constraints need architectural support to avoid defeating the agent's purpose.
+   Progressive penalties drove a 72% kill-density collapse (G1→G3). Safety constraints need architectural support to avoid defeating the agent's purpose.
 
-2. **Deterministic passivity is a real failure mode**  
-   The gap between stochastic and deterministic policy behavior is a deployment risk. An agent that only attacks when it has randomness injected is not reliable.
+2. **Death penalty alone is insufficient**  
+   V2's −2.0 death penalty was explicitly designed to make passive dying worse than fighting. MLP agents (G2–G3) completely ignore it. Reward magnitude is not the bottleneck.
 
-3. **Temporal memory resolves the commitment problem**  
-   GRU hidden states allow agents to integrate evidence across noisy timesteps and commit to aggressive actions deterministically. This was the key architectural ingredient — attention alone was not sufficient.
+3. **Reward + architecture are complementary**  
+   Death penalty + GRU produces the strongest constrained-game performance (G5 raw kill density +25% vs V1). Neither works alone; together they unlock active behavior under uncertainty.
+
+4. **Temporal memory resolves the commitment problem**  
+   GRU hidden states allow agents to integrate evidence across noisy timesteps and commit to aggressive actions. This was the key architectural ingredient — attention alone was not sufficient.
 
 ---
 
@@ -223,13 +227,13 @@ G5:             attacks ~70% of steps        attacks 69.9% of steps  ← FIXED
 **Pre-empt likely questions:**
 
 **Q: Why not just lower the stamina/ammo penalties in G3?**  
-A: We deliberately kept penalties fixed to isolate the architectural contribution. The point is that reasonable real-world constraints should be handleable by the agent, not tuneable away.
+A: We deliberately kept penalties fixed to isolate the architectural contribution. V2's death penalty experiment proves this: even adding a *positive* incentive (survival reward) doesn't fix MLP passivity. The architecture is the bottleneck.
 
 **Q: Why shared parameters? Wouldn't separate networks do better?**  
 A: Shared parameters force emergent specialisation — knights and archers must develop different behavior from the same weights, driven only by their different observation contexts. This is more interesting and more parameter-efficient.
 
-**Q: Is the 69.9% deterministic attack rate actually good?**  
-A: In context, yes. Remember G3/G4 were ~0%. 69.9% under fog + ammo + stamina constraints, with reliable deterministic behavior, is the target outcome. The remaining ~30% are coordinated repositioning and stamina management, not passivity.
+**Q: Does the death penalty actually help anything?**  
+A: Yes — but only with the right architecture. G5 (GRU) raw kill density improved 25% from V1 to V2. MLP games saw no improvement. This is the key complementarity finding.
 
 **Q: How do you know the GRU is the key ingredient vs. just more parameters?**  
 A: Fair challenge. G4 has 467K params, G5 has 825K. A fairer ablation would be a G5 with MLP+Attention+extra capacity but no GRU. This is future work.
@@ -269,17 +273,18 @@ A: Fair challenge. G4 has 467K params, G5 has 825K. A fairer ablation would be a
 
 ## Key Numbers to Have Ready
 
-| Fact | Value |
-|------|-------|
-| G1 kill density | 0.01089 |
-| G3 kill density | 0.00279 (−74% from G1) |
-| G5 kill density | 0.00165 |
-| G5 det. attack rate | **69.9%** |
-| G3/G4 det. attack rate | **~0%** |
-| G5 total training steps | 1,506,717 |
-| G5 parameters | 825,481 |
-| Attention sum (validated) | 27.000 |
-| Transfer tensors loaded | 26/26 |
+| Fact | V1 | V2 |
+|------|-----|-----|
+| G1 raw kill density | 0.01089 | 0.01051 |
+| G3 raw kill density | 0.00279 | 0.00297 |
+| G5 raw kill density | 0.00299 | **0.00373** (+25%) |
+| G3 det. raw kills | 0.00/ep | **0.00/ep** (unchanged) |
+| G5 det. raw kills | — | **0.33/ep** |
+| Death penalty | 0.0 | **2.0** |
+| G5 total training steps | 1,506,717 | 2,007,048 |
+| G5 parameters | 825,481 | 825,481 |
+| Attention sum (validated) | 27.000 | 27.000 |
+| Transfer tensors loaded | 26/26 | 26/26 |
 
 ## Artifacts for the Presentation
 

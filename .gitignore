@@ -15,6 +15,17 @@ htmlcov/
 .vscode/
 .idea/
 
+# LaTeX build artifacts
+docs/*.aux
+docs/*.bbl
+docs/*.blg
+docs/*.out
+docs/*.log
+docs/*.synctex.gz
+
+# V1 backup (too large for git)
+models_v1_backup/
+
 # Data and Results
 data/
 !data/raw/

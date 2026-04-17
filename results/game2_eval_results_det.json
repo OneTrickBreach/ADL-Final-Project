@@ -1,0 +1,15 @@
+{
+  "checkpoint": "models/game2/final.pt",
+  "game_level": 2,
+  "episodes": 10,
+  "deterministic": true,
+  "mean_return": -1.95,
+  "std_return": 0.15,
+  "mean_raw_kills": 0.05,
+  "mean_aggression": 0.05,
+  "mean_preservation": 0.0,
+  "mean_episode_length": 167.0,
+  "raw_kill_density": 0.0002994011976047904,
+  "kill_density": 0.0002994011976047904,
+  "mean_death_penalty": -2.0
+}

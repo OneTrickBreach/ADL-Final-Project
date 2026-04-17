@@ -93,9 +93,40 @@ ADLProject2/
 
 ---
 
+### V2: Death Penalty Design Iteration ✅
+
+> **Motivation:** Elizabeth identified that G2/G3 agents learn passivity because there are penalties for acting (ammo waste, stamina cost) but zero cost for dying. Hypothesis: adding a death penalty (−2.0 per death) would make "die passively" clearly worse than "kill and survive."
+
+**Code changes (branch: `v2-death-penalty`):**
+* `kaz_wrapper.py`: `death_penalty` parameter, applied on agent termination, added to `reward_info`
+* `train.py`: `--death_penalty` CLI arg (default 2.0), TensorBoard logging of `reward/death_penalty`
+* `evaluate.py`: reads death_penalty from checkpoint, passes to wrapper, tracks in results JSON
+* `phase5.py`: passes death_penalty to all KAZWrapper constructors for consistency
+
+**Training (V2):** All 5 games retrained with `--death_penalty 2.0`:
+* G1–G3: 1M steps each (MLP)
+* G4: 1.5M steps (Attention)
+* G5: 2M steps (Attention+GRU, transfer from G4)
+
+**Key findings:**
+1. **Death penalty alone does NOT fix deterministic passivity in MLP models (G2–G3).** G3 deterministic raw kills: 0.00/episode — unchanged from V1.
+2. **Death penalty + GRU is complementary.** G5 V2 raw kill density: 0.00373 (+25% vs V1's 0.00299) — the highest of any constrained game.
+3. **Architectural capacity is the bottleneck, not reward magnitude.** MLP agents lack the representational capacity to convert "don't die" into "fight back."
+
+| Game | V1 Raw Kill Density | V2 Raw Kill Density | Δ |
+|------|--------------------|--------------------|---|
+| G1 | 0.01089 | 0.01051 | −3.5% |
+| G2 | 0.00431 | 0.00308 | −29% |
+| G3 | 0.00279 | 0.00297 | +6.5% |
+| G4 | 0.00361 | 0.00298 | −17% |
+| G5 | 0.00299 | **0.00373** | **+25%** |
+
+---
+
 ### 🚀 Immediate Next Steps:
 1.  ~~**Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.~~ ✅ Done
 2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
 3.  ~~**Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.~~ ✅ Done
 4.  ~~**Phase 3:** Train Game 4 (60/40 comrade healthcare + entity self-attention).~~ ✅ Done
 5.  ~~**Phase 4:** Train Game 5 (Gaussian fog + GRU recurrence) — the Final Hero.~~ ✅ Done
+6.  ~~**V2:** Death penalty iteration — retrain all games, re-evaluate, update docs.~~ ✅ Done

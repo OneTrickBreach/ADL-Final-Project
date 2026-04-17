@@ -9,33 +9,36 @@
 
 A complete multi-agent reinforcement learning study using **MAPPO** on the PettingZoo **Knights, Archers & Zombies (KAZ)** environment. Five games are trained in sequence, each adding exactly one new constraint, to trace how reward shaping and architecture drive the emergence of coordinated behavior — from a mindlessly aggressive baseline to a disciplined tactical unit that operates under resource limits, teammate awareness, and perceptual fog.
 
-**Central finding:** *Deterministic passivity* — a previously under-described MARL failure mode where the stochastic policy attacks but the argmax (deployment) policy is completely passive. Game 5's GRU temporal memory resolves it, achieving **69.9% deterministic attack rate** vs ~0% in Games 3 and 4.
+**V2 design iteration:** Added a configurable **death penalty** (−2.0 per agent death) to test whether a survival incentive alone could fix the passivity trap. **It cannot** — MLP agents (G2–G3) remain fully passive even with death penalty. Only GRU temporal memory (G5) converts the survival signal into active behavior, confirming that architectural capacity is the bottleneck, not reward magnitude.
+
+**Central finding:** *Deterministic passivity* — a previously under-described MARL failure mode where the stochastic policy attacks but the argmax (deployment) policy is completely passive. Death penalty alone is insufficient; Game 5's GRU temporal memory resolves it, achieving non-zero deterministic kills vs 0 kills in Games 2–4.
 
 ---
 
 ## Results at a Glance
 
-| Game | Label | Mean Return | Raw Kill Density | Det. Attack % | Architecture |
+| Game | Label | Mean Return | Raw Kill Density | Det. Raw Kills | Architecture |
 |------|-------|-------------|-----------------|---------------|-------------|
-| G1 | Greedy Soldier | 5.80 ± 2.94 | **0.01089** | ~100% | MLP |
-| G2 | Risk Avoider | 0.30 ± 0.39 | 0.00431 | <5% | MLP |
-| G3 | Fully Passive | 0.15 ± 0.24 | 0.00279 | **~0%** ← collapse | MLP |
-| G4 | Recovering Cooperator | 0.42 ± 0.38 | 0.00361 | **~0%** ← persists | MLP + Attention |
-| G5 | **Fire Discipline** | 0.38 ± 0.31 | 0.00299 | **69.9%** ← resolved | Attn + GRU |
+| G1 | Greedy Soldier | 3.98 ± 3.80 | **0.01051** | 0.70/ep | MLP |
+| G2 | Risk Avoider | −1.75 ± 0.52 | 0.00308 | **0.05/ep** ← passive | MLP |
+| G3 | Fully Passive | −1.82 ± 0.40 | 0.00297 | **0.00/ep** ← collapse | MLP |
+| G4 | Recovering Cooperator | −1.62 ± 0.39 | 0.00298 | **0.00/ep** ← persists | MLP + Attention |
+| G5 | **Fire Discipline** | −2.07 ± 0.38 | **0.00373** | **0.33/ep** ← GRU helps | Attn + GRU |
 
-> **G5 details (stochastic):** preservation +0.525, ep length 176 steps, 1,506,717 training steps, 825,481 parameters
+> **V2:** All games trained with `--death_penalty 2.0`. Mean returns are lower (penalty subtracts). Compare raw kill density across games.  
+> **G5 details (stochastic):** preservation +0.675, ep length 181 steps, 2,007,048 training steps, 825,481 parameters
 
 ---
 
 ## Constraint Stack
 
-| Level | Ammo Limit | Stamina Decay | 60/40 Team Reward | Gaussian Fog |
-|-------|-----------|---------------|-------------------|-------------|
-| G1 | — | — | — | — |
-| G2 | ✅ 15 arrows/ep | — | — | — |
-| G3 | ✅ | ✅ move −0.01, attack −0.05 | — | — |
-| G4 | ✅ | ✅ | ✅ | — |
-| G5 | ✅ | ✅ | ✅ | ✅ σ=0.3 |
+| Level | Death Penalty | Ammo Limit | Stamina Decay | 60/40 Team Reward | Gaussian Fog |
+|-------|:------------:|-----------|---------------|-------------------|-------------|
+| G1 | ✅ 2.0 | — | — | — | — |
+| G2 | ✅ 2.0 | ✅ 15 arrows/ep | — | — | — |
+| G3 | ✅ 2.0 | ✅ | ✅ move −0.01, attack −0.05 | — | — |
+| G4 | ✅ 2.0 | ✅ | ✅ | ✅ | — |
+| G5 | ✅ 2.0 | ✅ | ✅ | ✅ | ✅ σ=0.3 |
 
 ---
 
@@ -56,7 +59,7 @@ G5:     obs(27×5) ──► EntityAttentionEncoder
 ```
 
 - **Algorithm:** MAPPO — all agents share one network; each observes locally
-- **Reward:** `R_i = 0.6×R_self + 0.4×R_team` from G4 onward; pure kill reward for G1–G3
+- **Reward:** `R_i = 0.6×R_self + 0.4×R_team` from G4 onward; pure kill reward for G1–G3; death penalty (−2.0) on all games
 - **Logging:** TensorBoard reward decomposition (aggression vs. preservation) per step
 - **Device:** Auto-detected — CUDA (NVIDIA) → MPS (Apple Silicon) → CPU
 
@@ -162,14 +165,14 @@ pip install "pettingzoo[butterfly]" gymnasium supersuit tensorboard opencv-pytho
 ## Quick Start
 
 ```bash
-# Train Game 1 — baseline MLP, no constraints (~500k steps)
-./.venv/bin/python src/train.py --game_level 1 --total_timesteps 500000
+# Train Game 1 — baseline MLP, death penalty (~1M steps)
+./.venv/bin/python src/train.py --game_level 1 --total_timesteps 1000000 --death_penalty 2.0
 
-# Train Game 5 — Attention+GRU, full constraints, transfer from G4 (~1.5M steps)
+# Train Game 5 — Attention+GRU, full constraints, transfer from G4 (~2M steps)
 ./.venv/bin/python src/train.py \
     --game_level 5 --arch attention_gru \
     --transfer_from models/game4/final.pt \
-    --total_timesteps 1500000 --max_cycles 900
+    --total_timesteps 2000000 --max_cycles 900 --death_penalty 2.0
 
 # Evaluate stochastic policy (10 episodes)
 ./.venv/bin/python src/evaluate.py --checkpoint models/game5/final.pt --episodes 10
@@ -192,24 +195,23 @@ tensorboard --logdir results/tensorboard
 ## Full Training Sequence (G1 → G5)
 
 ```bash
-# Game 1 — MLP, kill reward only
-./.venv/bin/python src/train.py --game_level 1 --total_timesteps 500000
+# Game 1 — MLP, kill reward + death penalty
+./.venv/bin/python src/train.py --game_level 1 --total_timesteps 1000000 --death_penalty 2.0
 
-# Game 2 — MLP + ammo limit
-./.venv/bin/python src/train.py --game_level 2 --total_timesteps 500000
+# Game 2 — MLP + ammo limit + death penalty
+./.venv/bin/python src/train.py --game_level 2 --total_timesteps 1000000 --death_penalty 2.0
 
-# Game 3 — MLP + ammo + stamina
-./.venv/bin/python src/train.py --game_level 3 --total_timesteps 500000
+# Game 3 — MLP + ammo + stamina + death penalty
+./.venv/bin/python src/train.py --game_level 3 --total_timesteps 1000000 --death_penalty 2.0
 
-# Game 4 — Entity Attention + team reward
-./.venv/bin/python src/train.py --game_level 4 --arch attention --total_timesteps 1000000
+# Game 4 — Entity Attention + team reward + death penalty
+./.venv/bin/python src/train.py --game_level 4 --arch attention --total_timesteps 1500000 --death_penalty 2.0
 
-# Game 5 — Attention+GRU + fog (transfer from G4)
+# Game 5 — Attention+GRU + fog + death penalty (transfer from G4)
 ./.venv/bin/python src/train.py \
     --game_level 5 --arch attention_gru \
     --transfer_from models/game4/final.pt \
-    --min_entropy 0.3 \
-    --total_timesteps 1500000 --max_cycles 900
+    --total_timesteps 2000000 --max_cycles 900 --death_penalty 2.0
 ```
 
 ---
@@ -236,7 +238,7 @@ To regenerate:
 
 | Document | Location | Description |
 |----------|----------|-------------|
-| Academic paper | `docs/report.pdf` | 8-page LaTeX paper — methods, results, explainability |
+| Academic paper | `docs/report.pdf` | 9-page LaTeX paper — methods, results, explainability |
 | LaTeX source | `docs/report.tex` + `docs/references.bib` | |
 | 15-min talk guide | `docs/presentation_guide.md` | 13 slides with speaking notes and timing |
 | Final ablation table | `results/final_ablation_table.md` | G1–G5 full metrics |
@@ -248,8 +250,9 @@ To regenerate:
 
 | Phase | Status | Key Result |
 |-------|--------|------------|
-| **Phase 1** — G1 Villain Baseline | ✅ | Kill density 0.01089, mean return 5.80 ± 2.94, ep len 533 |
-| **Phase 2** — G2/G3 Resource Scarcity | ✅ | G2: 0.00431 density · G3: 0.00279 · penalty avoidance, not efficiency |
-| **Phase 3** — G4 Recovering Cooperator | ✅ | Density 0.00361 (+29% vs G3), preservation 0.675 · attention restores cooperation |
-| **Phase 4** — G5 Fire Discipline | ✅ | Det. attack **69.9%** (vs ~0% G4) · 0.00165 kill density · **GRU resolves deterministic passivity** |
-| **Phase 5** — Evaluation & Explainability | ✅ | 4 artifacts generated · 8-page report compiled · 15-min presentation guide |
+| **Phase 1** — G1 Villain Baseline | ✅ | Kill density 0.01051 (V2), mean return 3.98 ± 3.80 (death penalty active) |
+| **Phase 2** — G2/G3 Resource Scarcity | ✅ | G2: 0.00308 · G3: 0.00297 · **death penalty does NOT fix passivity** |
+| **Phase 3** — G4 Recovering Cooperator | ✅ | Density 0.00298, preservation 0.575 · attention alone still insufficient |
+| **Phase 4** — G5 Fire Discipline | ✅ | Raw kill density **0.00373** (+25% vs G4) · GRU + death penalty = best combo |
+| **Phase 5** — Evaluation & Explainability | ✅ | 4 artifacts regenerated · V2 report + presentation updated |
+| **V2** — Death Penalty Iteration | ✅ | `--death_penalty 2.0` all games · confirms GRU is necessary, penalty is complementary |

@@ -132,12 +132,23 @@ self.LOCK_RADIUS_PX = int(knight_lock_radius_fraction * self.SCREEN_W)  # 192
 self.END_ZONE_Y     = int((1 - end_zone_fraction) * self.SCREEN_H)     # 576
 ```
 
-**Constants:**
+**Constants (verified in §9 pre-flight, Apr-17):**
 ```python
-ACTION_NOOP   = 0
-ACTION_ATTACK = 4   # verified in existing wrapper: external 4 = fire/attack
-ACTION_MOVEMENT_SET = {1, 2, 3, 5}   # confirmed via pre-flight check §9
+# KAZ external action layout (parallel_env.step receives ext actions 0..5;
+# the env maps ext+1 -> internal and Player.update uses internal values).
+# Internal: 1=forward, 2=backward, 3=turn CCW, 4=turn CW, 5=weapon, 6=noop.
+# Therefore external:
+ACTION_FORWARD  = 0
+ACTION_BACKWARD = 1
+ACTION_TURN_CCW = 2
+ACTION_TURN_CW  = 3
+ACTION_ATTACK   = 4   # external 4 = weapon / fire arrow (matches V1 wrapper)
+ACTION_NOOP     = 5   # NOT 0 — corrected after pre-flight (see §9)
+ACTION_MOVEMENT_SET = {0, 1, 2, 3}
 SCREEN_W, SCREEN_H = 1280, 720
+# KAZ constants import path:
+#   from pettingzoo.butterfly.knights_archers_zombies.src import constants as kaz_const
+# kaz_const.ZOMBIE_Y_SPEED = 5, kaz_const.KNIGHT_SPEED = 25 (at FPS=15).
 ```
 
 **Action-masking policy (affects §4.1.5 steps 2.b–2.f):**

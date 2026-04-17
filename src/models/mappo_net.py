@@ -84,12 +84,15 @@ class MAPPONet(nn.Module):
     def __init__(self, obs_dim: int, act_dim: int, hidden_dim: int = 256,
                  arch: str = "mlp",
                  num_entities: int = 27, entity_dim: int = 5,
-                 num_heads: int = 4):
+                 num_heads: int = 4,
+                 extra_dim: int = 0):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
         self.arch = arch
         self.hidden_dim = hidden_dim
+        self.extra_dim = extra_dim
+        self.entity_obs_dim = num_entities * entity_dim
 
         # ── Encoder ──────────────────────────────────────────
         if arch == "mlp":
@@ -103,6 +106,8 @@ class MAPPONet(nn.Module):
             self.entity_attention = EntityAttentionEncoder(
                 entity_dim, num_entities, hidden_dim, num_heads,
             )
+            if extra_dim > 0:
+                self.extra_proj = nn.Linear(extra_dim, hidden_dim)
             self.backbone = nn.Sequential(
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.ReLU(),
@@ -111,6 +116,8 @@ class MAPPONet(nn.Module):
             self.entity_attention = EntityAttentionEncoder(
                 entity_dim, num_entities, hidden_dim, num_heads,
             )
+            if extra_dim > 0:
+                self.extra_proj = nn.Linear(extra_dim, hidden_dim)
             # GRUCell processes one timestep at a time during rollout
             self.gru = nn.GRUCell(hidden_dim, hidden_dim)
             self.backbone = nn.Sequential(
@@ -177,11 +184,23 @@ class MAPPONet(nn.Module):
                 }
         """
         new_hidden = None
+        # Split obs into entity block and extras, if extra_dim > 0
+        if self.extra_dim > 0 and self.arch in ("attention", "attention_gru"):
+            obs_entities = obs[:, : self.entity_obs_dim]
+            obs_extras = obs[:, self.entity_obs_dim : self.entity_obs_dim + self.extra_dim]
+        else:
+            obs_entities = obs
+            obs_extras = None
+
         if self.arch == "attention":
-            attn_out = self.entity_attention(obs)
+            attn_out = self.entity_attention(obs_entities)
+            if obs_extras is not None:
+                attn_out = attn_out + self.extra_proj(obs_extras)
             features = self.backbone(attn_out)
         elif self.arch == "attention_gru":
-            attn_out = self.entity_attention(obs)
+            attn_out = self.entity_attention(obs_entities)
+            if obs_extras is not None:
+                attn_out = attn_out + self.extra_proj(obs_extras)
             if hidden is None:
                 hidden = torch.zeros(
                     obs.shape[0], self.hidden_dim, device=obs.device, dtype=obs.dtype

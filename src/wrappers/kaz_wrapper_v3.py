@@ -250,12 +250,9 @@ class KAZWrapperV3:
             ax, ay = pos
 
             if self._is_archer(agent):
-                cands = [
-                    (zid, zx, zy) for zid, zx, zy in (
-                        (zid, zx, zy) for zid, zx, zy, _ in zombies_snapshot
-                    ) if zid not in knight_locked_ids
-                ]
-                # Pragmatic override for G5
+                cands = [(zid, zx, zy) for zid, zx, zy, _ in zombies_snapshot
+                         if zid not in knight_locked_ids]
+                pragmatic_ids = set()
                 if self.cfg["pragmatic"]:
                     for kagent, ktid in knight_locks.items():
                         if ktid is None or ktid not in zombie_map:
@@ -268,10 +265,12 @@ class KAZWrapperV3:
                         inter_time = math.hypot(kpos[0] - zx, kpos[1] - zy) / max(self.KNIGHT_SPEED, 1)
                         if cross_time < inter_time:
                             cands.append((ktid, zx, zy))
-                            self.pragmatic_overrides += 1
+                            pragmatic_ids.add(ktid)
                 if cands:
-                    zid, zx, zy = min(cands, key=lambda t: math.hypot(t[1] - ax, t[2] - ay))
-                    self.lock_target[agent] = zid
+                    chosen = min(cands, key=lambda t: math.hypot(t[1] - ax, t[2] - ay))
+                    self.lock_target[agent] = chosen[0]
+                    if chosen[0] in pragmatic_ids:
+                        self.pragmatic_overrides += 1
                 else:
                     self.lock_target[agent] = None
 
@@ -388,22 +387,33 @@ class KAZWrapperV3:
                 modified[a] = ACTION_NOOP
                 continue
 
-            # (c) Patrol role constraint (G4+ hard mask; G3 soft via reward)
-            if is_knight and cfg["roles_on"] and self.knight_role.get(a) == "patrol" \
-                    and orig in ACTION_MOVEMENT_SET:
-                pos = self._agent_position(a)
-                if pos is not None and cfg["lock_on"]:
-                    # Hard: if moving would leave end zone, drop to NOOP
-                    # Simple heuristic: forbid ACTION_FORWARD when already at/above end zone
-                    _, ay = pos
-                    if ay < self.END_ZONE_Y and orig == ACTION_FORWARD:
-                        # allow — they need to move into the end zone
-                        pass
-                    elif ay >= self.END_ZONE_Y and orig == ACTION_BACKWARD:
-                        # would exit end zone upward — hard mask
-                        invalid_flags[a] = True
-                        modified[a] = ACTION_NOOP
-                        continue
+            # (c) Patrol role constraint (G4+): direction-aware hard mask that
+            # prevents a patrol knight from crossing ABOVE the end-zone line.
+            # Because KAZ movement direction depends on the agent's current
+            # orientation vector `direction=(dx,dy)`, we project the step onto
+            # y and only mask when the resulting y would leave the end zone.
+            if (is_knight and cfg["roles_on"] and cfg["lock_on"]
+                    and self.knight_role.get(a) == "patrol"
+                    and orig in (ACTION_FORWARD, ACTION_BACKWARD)):
+                try:
+                    idx = raw.agent_name_mapping.get(a)
+                    p = raw.agent_list[idx] if idx is not None else None
+                    if p is not None and getattr(p, "alive", False):
+                        dy = float(p.direction.y)
+                        sign = -1.0 if orig == ACTION_FORWARD else 1.0
+                        # Predicted y change this step (forward uses +dir, backward uses -dir)
+                        # Player.update uses rect.y -= sin(angle+90)*speed for forward,
+                        # rect.y += sin(angle+90)*speed for backward.
+                        # direction.y = -sin(angle+90), so predicted dy = sign * (-dy) * speed.
+                        # Sign of predicted delta-y = sign * (-dy); negative means moving up.
+                        predicted_dy = sign * (-dy) * float(p.speed)
+                        ay_now = float(p.rect.centery)
+                        if ay_now >= self.END_ZONE_Y and (ay_now + predicted_dy) < self.END_ZONE_Y:
+                            invalid_flags[a] = True
+                            modified[a] = ACTION_NOOP
+                            continue
+                except Exception:
+                    pass
 
             # (d) Ammo check
             if is_archer and modified[a] == ACTION_ATTACK:

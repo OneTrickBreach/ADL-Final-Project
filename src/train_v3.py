@@ -57,6 +57,9 @@ def parse_args():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--log_interval", type=int, default=5)
     p.add_argument("--save_interval", type=int, default=20)
+    p.add_argument("--output_suffix", type=str, default="",
+                   help="Appended to output dirs: models/v3<suf>/, results/v3<suf>/, "
+                        "results/tensorboard_v3<suf>/. Use '_1' for V3.1 runs.")
     return p.parse_args()
 
 
@@ -173,12 +176,14 @@ def train(args):
         print(f"[train_v3] Transferred {transferred} tensors from {args.transfer_from} "
               f"(skipped {skipped})")
 
-    log_dir = f"results/tensorboard_v3/{args.game}"
+    suf = args.output_suffix or ""
+    log_dir = f"results/tensorboard_v3{suf}/{args.game}"
     os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir=log_dir)
 
-    ckpt_dir = f"models/v3/{args.game}"
+    ckpt_dir = f"models/v3{suf}/{args.game}"
     os.makedirs(ckpt_dir, exist_ok=True)
+    results_dir = f"results/v3{suf}"
 
     global_step = 0; update_count = 0; episode_count = 0
     episode_returns, episode_lengths = [], []
@@ -403,8 +408,8 @@ def train(args):
         "mean_episode_length": float(np.mean(episode_lengths[-50:])) if episode_lengths else 0.0,
         "last_episode_stats": last_ep_stats,
     }
-    os.makedirs("results/v3", exist_ok=True)
-    with open(f"results/v3/{args.game}_training_metrics.json", "w") as f:
+    os.makedirs(results_dir, exist_ok=True)
+    with open(f"{results_dir}/{args.game}_training_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2, default=lambda o: None)
 
     writer.close(); env.close()

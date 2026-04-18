@@ -60,13 +60,13 @@ class KAZWrapperV3:
         duration_seconds: int = 30,
         num_archers: int = 2,
         num_knights: int = 2,
-        global_ammo_pool: int = 30,
-        individual_ammo_pool: int = 15,
-        knight_stamina_pool: int = 100,
+        global_ammo_pool: int = 60,
+        individual_ammo_pool: int = 30,
+        knight_stamina_pool: int = 150,
         end_zone_fraction: float = 0.20,
-        knight_lock_radius_fraction: float = 0.15,
-        spawn_rate: int = 20,
-        max_zombies: int = 10,
+        knight_lock_radius_fraction: float = 0.25,
+        spawn_rate: int = 8,
+        max_zombies: int = 20,
         ammo_mode_override: str | None = None,
         action_mask_mode: str = "soft",   # "soft" | "hard"
         invalid_action_penalty: float = 0.05,
@@ -146,7 +146,8 @@ class KAZWrapperV3:
         self.knight_role: dict[str, str] = {}
         self.lock_target: dict[str, int | None] = {}
         self.failure_count = 0
-        self.zombie_prev: dict[int, tuple[float, float]] = {}
+        self._crossed_ids: set[int] = set()
+        self._prev_alive_count = 0
         self.attack_count: dict[str, int] = {}
         self.kill_count: dict[str, int] = {}
         self.last_reward_info: dict[str, dict] = {}
@@ -304,7 +305,12 @@ class KAZWrapperV3:
         self.failure_count = 0
         self.pragmatic_overrides = 0
         self.last_failures_this_step = 0
-        self.zombie_prev = {}
+        self._crossed_ids = set()
+        raw = self._env.unwrapped
+        self._prev_alive_count = (
+            len(getattr(raw, "archer_list", []))
+            + len(getattr(raw, "knight_list", []))
+        )
 
         agents = list(self._env.agents)
         archers = [a for a in agents if self._is_archer(a)]
@@ -456,9 +462,6 @@ class KAZWrapperV3:
                     else:
                         lock_respected[a] = True  # archer firing with a valid lock
 
-        # Snapshot zombie positions for cross detection
-        self.zombie_prev = {zid: (zx, zy) for zid, zx, zy, _ in zombies_snapshot}
-
         # Env step
         obs, raw_rewards, terms, truncs, infos = self._env.step(modified)
 
@@ -467,24 +470,58 @@ class KAZWrapperV3:
             if r > 0.5:
                 self.kill_count[a] = self.kill_count.get(a, 0) + 1
 
-        # Cross detection
-        new_zombies = self._zombies()
-        current_ids = {zid for zid, _, _, _ in new_zombies}
-        any_kill = any(r > 0.5 for r in raw_rewards.values())
+        # --- V3.1 failure detector: line-cross + agent-breach -----------
+        raw = self._env.unwrapped
+        CROSS_Y = self.SCREEN_H - self.ZOMBIE_Y_SPEED
+
         failures_this_step = 0
-        for zid, (zx, zy) in self.zombie_prev.items():
-            if zid not in current_ids:
-                # Disappeared — killed or crossed
-                crossed = zy >= (self.SCREEN_H - self.ZOMBIE_Y_SPEED - 5)
-                if crossed and not any_kill:
+
+        # (a) zombies past the end line (still in list; KAZ does not remove crossers)
+        for z in list(getattr(raw, "zombie_list", [])):
+            try:
+                zid = id(z)
+                if z.rect.centery >= CROSS_Y and zid not in self._crossed_ids:
+                    self._crossed_ids.add(zid)
                     failures_this_step += 1
-                elif crossed and any_kill:
-                    # Ambiguous; per Risk #2 prefer the kill (skip cross)
-                    pass
+            except Exception:
+                continue
+
+        # (b) agents killed by zombie contact this step (archer/knight lists shrink)
+        cur_alive = (
+            len(getattr(raw, "archer_list", []))
+            + len(getattr(raw, "knight_list", []))
+        )
+        if cur_alive < self._prev_alive_count:
+            failures_this_step += (self._prev_alive_count - cur_alive)
+        self._prev_alive_count = cur_alive
+
         self.failure_count += failures_this_step
         self.last_failures_this_step = failures_this_step
 
+        # --- V3.1 tier-2: episode-continuation override -----------------
+        # Allow episode to continue past individual line crosses so the
+        # policy can learn from multiple failures per rollout. Only
+        # override when agents are still alive and we have not hit the
+        # natural truncation.
+        if (
+            not getattr(raw, "run", True)
+            and cur_alive > 0
+            and self.cycle + 1 < self.max_cycles
+        ):
+            raw.run = True
+            terms = {a: False for a in terms}
+            truncs = {a: False for a in truncs}
+            # Prevent the just-counted crossers from re-triggering
+            # zombie_endscreen on the very next step.
+            for z in list(getattr(raw, "zombie_list", [])):
+                try:
+                    if id(z) in self._crossed_ids and z.rect.centery >= CROSS_Y:
+                        raw.zombie_list.remove(z)
+                except Exception:
+                    continue
+
         # Refresh locks after step (targets may have died)
+        new_zombies = self._zombies()
         if cfg["lock_on"]:
             self._acquire_locks(new_zombies)
 
@@ -497,7 +534,9 @@ class KAZWrapperV3:
             role_b = 0.0
             lock_b = 0.0
             pen = 0.0
-            failure_share = -self.failure_penalty * failures_this_step  # applied to all living
+            # Preemptive cap (plan §9 Risk #3): clamp reward term at 3/step
+            # to keep training stable; raw failure_count is unclamped.
+            failure_share = -self.failure_penalty * min(failures_this_step, 3)
 
             if cfg["roles_on"] and self._is_knight(a):
                 pos = self._agent_position(a)

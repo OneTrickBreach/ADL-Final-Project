@@ -44,6 +44,9 @@ def parse_args():
                         "read from checkpoint args if absent.")
     p.add_argument("--duration_seconds", type=int, default=30)
     p.add_argument("--output_suffix", type=str, default="")
+    p.add_argument("--results_dir", type=str, default="results/v3",
+                   help="Directory for eval JSON + demo outputs (and "
+                        "ammo_mode.txt fallback).")
     return p.parse_args()
 
 
@@ -65,10 +68,10 @@ def _resolve_ammo_mode(args):
             pass
     if args.ammo_mode:
         return args.ammo_mode
-    pth = "results/v3/ammo_mode.txt"
-    if os.path.isfile(pth):
-        with open(pth) as f:
-            return f.read().strip()
+    for pth in (f"{args.results_dir}/ammo_mode.txt", "results/v3/ammo_mode.txt"):
+        if os.path.isfile(pth):
+            with open(pth) as f:
+                return f.read().strip()
     return "individual"
 
 
@@ -125,7 +128,7 @@ def evaluate(args):
 
     video_dir = None
     if args.record:
-        video_dir = f"results/v3/{args.game}_demo"
+        video_dir = f"{args.results_dir}/{args.game}_demo"
         os.makedirs(video_dir, exist_ok=True)
 
     per_episode = []
@@ -258,8 +261,8 @@ def evaluate(args):
 
     det = "_det" if args.deterministic else ""
     suffix = f"_{args.output_suffix}" if args.output_suffix else ""
-    os.makedirs("results/v3", exist_ok=True)
-    path = f"results/v3/{args.game}_eval_results{det}{suffix}.json"
+    os.makedirs(args.results_dir, exist_ok=True)
+    path = f"{args.results_dir}/{args.game}_eval_results{det}{suffix}.json"
     with open(path, "w") as f:
         json.dump(summary, f, indent=2, default=lambda o: None)
     print(f"\n[eval_v3] score={summary['score_mean']:.2f} ± {summary['score_std']:.2f} "

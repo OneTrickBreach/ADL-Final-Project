@@ -1,13 +1,14 @@
 """V3 artifact generation: figures + side-by-side demo.
 
 Generates:
-  - results/v3/score_evolution.png
-  - results/v3/metric_breakdown.png
-  - results/v3/saliency_v3.png        (best-effort, skipped gracefully if missing)
-  - results/v3/demo_sidebyside_v3.mp4 (best-effort from G0 and G5 videos)
+  - {output_dir}/score_evolution.png
+  - {output_dir}/metric_breakdown.png
+  - {output_dir}/saliency_v3.png        (best-effort, skipped gracefully if missing)
+  - {output_dir}/demo_sidebyside_v3.mp4 (best-effort from G0 and G5 videos)
 
 Assumes evaluate_v3.py has been run for all 7 games.
 """
+import argparse
 import json
 import os
 import sys
@@ -21,18 +22,18 @@ sys.path.insert(0, ".")
 GAMES = ["g0", "g1a", "g1b", "g2", "g3", "g4", "g5"]
 
 
-def _load(game, det=False):
+def _load(game, results_dir="results/v3", det=False):
     suffix = "_det" if det else ""
-    path = f"results/v3/{game}_eval_results{suffix}.json"
+    path = f"{results_dir}/{game}_eval_results{suffix}.json"
     if not os.path.isfile(path):
         return None
     with open(path) as f:
         return json.load(f)
 
 
-def fig_score_evolution():
+def fig_score_evolution(results_dir, output_dir):
     import matplotlib.pyplot as plt
-    data = {g: _load(g) for g in GAMES}
+    data = {g: _load(g, results_dir=results_dir) for g in GAMES}
     means = [d["score_mean"] if d else 0 for d in data.values()]
     stds = [d["score_std"] if d else 0 for d in data.values()]
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -45,15 +46,15 @@ def fig_score_evolution():
         ax.text(b.get_x() + b.get_width() / 2, b.get_height(),
                 f"{m:.1f}", ha="center", va="bottom", fontsize=9)
     plt.tight_layout()
-    out = "results/v3/score_evolution.png"
+    out = f"{output_dir}/score_evolution.png"
     plt.savefig(out, dpi=150)
     plt.close()
     print(f"[fig] {out}")
 
 
-def fig_metric_breakdown():
+def fig_metric_breakdown(results_dir, output_dir):
     import matplotlib.pyplot as plt
-    data = {g: _load(g) for g in GAMES}
+    data = {g: _load(g, results_dir=results_dir) for g in GAMES}
     games = [g for g in GAMES if data[g] is not None]
     def _vals(key):
         return [data[g][key] for g in games]
@@ -78,13 +79,13 @@ def fig_metric_breakdown():
     ax.set_xticks(x); ax.set_xticklabels(games)
     ax.set_title("Attacks (archer vs knight)"); ax.legend()
     plt.tight_layout()
-    out = "results/v3/metric_breakdown.png"
+    out = f"{output_dir}/metric_breakdown.png"
     plt.savefig(out, dpi=150)
     plt.close()
     print(f"[fig] {out}")
 
 
-def fig_saliency_v3():
+def fig_saliency_v3(models_dir="models/v3", output_dir="results/v3"):
     """Attention heatmaps for G3 vs G5 (best-effort)."""
     try:
         import matplotlib.pyplot as plt
@@ -100,7 +101,7 @@ def fig_saliency_v3():
     fig, axes = plt.subplots(1, 2, figsize=(9, 4))
     for i, g in enumerate(["g3", "g5"]):
         ax = axes[i]
-        ckpt_path = f"models/v3/{g}/final.pt"
+        ckpt_path = f"{models_dir}/{g}/final.pt"
         if not os.path.isfile(ckpt_path):
             ax.set_title(f"{g} (no ckpt)"); ax.axis("off"); continue
         ck = torch.load(ckpt_path, map_location=device, weights_only=False)
@@ -147,13 +148,13 @@ def fig_saliency_v3():
             plt.colorbar(im, ax=ax, fraction=0.04)
         env.close()
     plt.tight_layout()
-    out = "results/v3/saliency_v3.png"
+    out = f"{output_dir}/saliency_v3.png"
     plt.savefig(out, dpi=150)
     plt.close()
     print(f"[fig] {out}")
 
 
-def demo_sidebyside():
+def demo_sidebyside(results_dir="results/v3", output_dir="results/v3"):
     """Stitch G0 and G5 demo videos side-by-side (best-effort)."""
     try:
         import cv2
@@ -161,7 +162,7 @@ def demo_sidebyside():
         print("[demo] cv2 missing, skipping")
         return
     def _find(game):
-        cand = sorted(glob(f"results/v3/{game}_demo/episode_*.mp4"))
+        cand = sorted(glob(f"{results_dir}/{game}_demo/episode_*.mp4"))
         return cand[0] if cand else None
     a = _find("g0"); b = _find("g5")
     if not (a and b):
@@ -173,7 +174,7 @@ def demo_sidebyside():
     wb = int(vb.get(cv2.CAP_PROP_FRAME_WIDTH)); hb = int(vb.get(cv2.CAP_PROP_FRAME_HEIGHT))
     H = max(ha, hb)
     W = wa + wb
-    out = "results/v3/demo_sidebyside_v3.mp4"
+    out = f"{output_dir}/demo_sidebyside_v3.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     vid = cv2.VideoWriter(out, fourcc, fps, (W, H))
     while True:
@@ -186,10 +187,10 @@ def demo_sidebyside():
     print(f"[demo] {out}")
 
 
-def ablation_table():
+def ablation_table(results_dir="results/v3", output_dir="results/v3"):
     rows = []
     for g in GAMES:
-        d = _load(g)
+        d = _load(g, results_dir=results_dir)
         if d is None:
             rows.append((g, "—", "—", "—", "—", "—", "—", "—"))
             continue
@@ -208,16 +209,29 @@ def ablation_table():
              "|" + "|".join(["---"] * len(hdr)) + "|"]
     for r in rows:
         lines.append("| " + " | ".join(r) + " |")
-    out = "results/v3/ablation_table.md"
+    out = f"{output_dir}/ablation_table.md"
     with open(out, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"[table] {out}")
 
 
+def parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--results_dir", type=str, default="results/v3",
+                   help="Directory to READ eval JSONs / demo videos from.")
+    p.add_argument("--output_dir", type=str, default=None,
+                   help="Directory to WRITE figures/tables to. Defaults to --results_dir.")
+    p.add_argument("--models_dir", type=str, default="models/v3",
+                   help="Directory containing {game}/final.pt (for saliency).")
+    return p.parse_args()
+
+
 if __name__ == "__main__":
-    os.makedirs("results/v3", exist_ok=True)
-    fig_score_evolution()
-    fig_metric_breakdown()
-    fig_saliency_v3()
-    demo_sidebyside()
-    ablation_table()
+    args = parse_args()
+    output_dir = args.output_dir or args.results_dir
+    os.makedirs(output_dir, exist_ok=True)
+    fig_score_evolution(args.results_dir, output_dir)
+    fig_metric_breakdown(args.results_dir, output_dir)
+    fig_saliency_v3(models_dir=args.models_dir, output_dir=output_dir)
+    demo_sidebyside(results_dir=args.results_dir, output_dir=output_dir)
+    ablation_table(results_dir=args.results_dir, output_dir=output_dir)

@@ -36,7 +36,7 @@ $PY src/train_v3.py --game g4 --ammo_mode "$AMMO_MODE" --total_timesteps 1500000
     --transfer_from models/v3/g3/final.pt
 
 echo "[7/7] Training G5 (+pragmatic, <-G4)..."
-$PY src/train_v3.py --game g5 --ammo_mode "$AMMO_MODE" --total_timesteps 1500000 \
+$PY src/train_v3.py --game g5 --ammo_mode "$AMMO_MODE" --total_timesteps 2000000 \
     --transfer_from models/v3/g4/final.pt
 
 echo "V3 TRAINING COMPLETE. Tell Cascade to run evaluation pipeline."

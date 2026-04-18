@@ -1,6 +1,4 @@
 \documentclass[11pt,a4paper]{article}
-
-% ── Packages ──────────────────────────────────────────────────────────────────
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
@@ -19,548 +17,459 @@
 \usepackage{authblk}
 \usepackage[numbers,sort&compress]{natbib}
 
-% ── Hyperref config ───────────────────────────────────────────────────────────
 \hypersetup{
-  colorlinks=true,
-  linkcolor=blue!70!black,
-  citecolor=green!50!black,
-  urlcolor=blue!70!black,
-  pdftitle={Shaping Emergent Behavior in MARL: A Five-Stage Ablation on KAZ},
-  pdfauthor={ADLProject2}
+  colorlinks=true, linkcolor=blue!70!black,
+  citecolor=green!50!black, urlcolor=blue!70!black,
+  pdftitle={Structured Teamwork in Multi-Agent PPO},
+  pdfauthor={ADLProject2 V3}
 }
 
-% ── Section formatting ────────────────────────────────────────────────────────
 \titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
-\titlespacing{\section}{0pt}{12pt}{4pt}
-\titlespacing{\subsection}{0pt}{8pt}{2pt}
 
-% ── Code listing style ────────────────────────────────────────────────────────
-\lstset{
-  basicstyle=\footnotesize\ttfamily,
-  breaklines=true,
-  frame=single,
-  backgroundcolor=\color{gray!8},
-  rulecolor=\color{gray!40},
-  xleftmargin=8pt,
-  xrightmargin=8pt,
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  numbersep=6pt,
-  keywordstyle=\color{blue!70!black}\bfseries,
-  commentstyle=\color{green!50!black},
-  stringstyle=\color{orange!70!black},
-  language=Python
-}
+\newcommand{\gz}{\textbf{G0}}
+\newcommand{\ga}{\textbf{G1a}}
+\newcommand{\gb}{\textbf{G1b}}
+\newcommand{\gii}{\textbf{G2}}
+\newcommand{\giii}{\textbf{G3}}
+\newcommand{\giv}{\textbf{G4}}
+\newcommand{\gv}{\textbf{G5}}
 
-% ── Colour definitions ────────────────────────────────────────────────────────
-\definecolor{g1red}{HTML}{e74c3c}
-\definecolor{g2orange}{HTML}{e67e22}
-\definecolor{g3gray}{HTML}{95a5a6}
-\definecolor{g4blue}{HTML}{3498db}
-\definecolor{g5green}{HTML}{2ecc71}
-
-% ── Custom commands ───────────────────────────────────────────────────────────
-\newcommand{\gameone}{\textcolor{g1red}{\textbf{G1}}}
-\newcommand{\gametwo}{\textcolor{g2orange}{\textbf{G2}}}
-\newcommand{\gamethree}{\textcolor{g3gray}{\textbf{G3}}}
-\newcommand{\gamefour}{\textcolor{g4blue}{\textbf{G4}}}
-\newcommand{\gamefive}{\textcolor{g5green}{\textbf{G5}}}
-
-% ═════════════════════════════════════════════════════════════════════════════
 \begin{document}
-% ═════════════════════════════════════════════════════════════════════════════
 
-\title{\textbf{Shaping Emergent Behavior in Multi-Agent PPO:\\
-A Five-Stage Ablation Study on Knights-Archers-Zombies}}
-
-\author[1]{ADLProject2}
-\affil[1]{Advanced Deep Learning, 2025--2026}
+\title{\textbf{Structured Teamwork in Multi-Agent PPO:\\
+A Seven-Game Study of Coordination Primitives on Knights-Archers-Zombies}}
+\author[1]{ADLProject2 (V3 Overhaul)}
+\affil[1]{Advanced Deep Learning, CS7180 2025--2026}
 \date{\today}
-
 \maketitle
 
-% ── Abstract ─────────────────────────────────────────────────────────────────
 \begin{abstract}
-We present a structured five-stage ablation study of reward shaping and
-architectural design in a shared-parameter Multi-Agent Proximal Policy
-Optimisation (MAPPO) system, evaluated on the Knights-Archers-Zombies (KAZ)
-cooperative environment from PettingZoo. Starting from a bare kill-reward
-baseline (\gameone: \emph{Greedy Soldier}), we progressively stack ammo
-restrictions (\gametwo), stamina penalties (\gamethree), 60/40 team-health
-rewards with entity-level self-attention (\gamefour), and finally Gaussian
-observation fog with GRU temporal memory (\gamefive: \emph{Fire Discipline}).
-Our central finding is the diagnosis and resolution of \emph{deterministic
-passivity}---a policy collapse phenomenon where agents trained with strong
-penalties learn to avoid all action under a greedy (argmax) policy. In a V2
-design iteration, we add a configurable death penalty ($-2.0$ per death) to
-test whether a survival incentive alone fixes passivity. It does not: MLP
-agents (G2--G3) remain fully passive. Only \gamefive{}'s GRU temporal memory
-converts the survival signal into active behaviour, confirming that
-architectural capacity---not reward magnitude---is the bottleneck. All code,
-checkpoints, and visualisations are available in the project repository.
+We study cooperative multi-agent reinforcement learning on PettingZoo's
+Knights-Archers-Zombies (KAZ) environment through a controlled seven-game
+ablation that isolates the contribution of four coordination primitives:
+(i) ammo and stamina discipline, (ii) role assignment (forward knight vs.\
+end-zone patrol knight), (iii) hard target locks with cross-role skip
+rules, and (iv) a pragmatic archer override that violates locks when a
+zombie is projected to cross the end zone before a knight can intercept.
+Two games (\gz{} through \gb{}) are evaluated with scripted heuristics to
+establish ceiling and floor; four games (\gii--\gv{}) are trained with
+shared-parameter MAPPO using entity self-attention (\gii{}) or
+attention + GRU (\giii--\gv{}) with transfer-learning between adjacent
+games. All games share identical episode length, spawn rates, and
+evaluation seeds so that score differences isolate the primitive. Our
+central finding is that \emph{role assignment is the single most
+impactful coordination primitive}: adding forward/patrol roles with
+temporal memory (\giii{}) improves stochastic score by \textbf{+96\%}
+over the learned ammo-discipline baseline (\gii{}) with no extra reward
+engineering. Conversely, the tighter coordination rules introduced in
+\giv{} and \gv{} (lock radii, cross-role skip, pragmatic override)
+produce a measurable \emph{knight passivity} regime in which archers
+perform nearly all eliminations. We argue this is a clean negative
+result: the ablation lets us attribute the loss to a specific primitive
+and motivates the remediations in Section~\ref{sec:discussion}.
 \end{abstract}
 
-\noindent\rule{\linewidth}{0.4pt}
-
-% ── 1. Introduction ───────────────────────────────────────────────────────────
 \section{Introduction}
 \label{sec:intro}
 
-Cooperative multi-agent reinforcement learning (MARL) presents unique
-challenges beyond single-agent RL: agents must coordinate emergent behaviour
-without explicit communication, manage shared resources, and remain robust to
-partial observability. Reward shaping is a powerful but double-edged tool---it
-can guide agents toward desired behaviours while inadvertently suppressing
-beneficial exploration or inducing unintended policy collapse
-\cite{ng1999policy}.
+Cooperative MARL presents challenges beyond single-agent RL: agents must
+coordinate without explicit communication, share limited resources, and
+remain robust to partial observability. Prior work on KAZ and similar
+benchmarks typically explores either \emph{reward shaping} or
+\emph{architectural upgrades} in isolation.
 
-This work asks a focused question: \emph{how does the progressive addition of
-environmental constraints and architectural upgrades shape the emergent
-behaviour of MAPPO agents?} We operationalise this through a five-game
-ablation where each game adds exactly one new element, enabling clean
-attribution of behavioural changes.
+This work takes a complementary route. Rather than asking which reward
+shaping mix is best, we ask: \emph{how much cooperative performance can
+be recovered by building structure into the environment itself?} We
+define four progressively strict coordination primitives, fix every other
+variable (episode length, spawn rate, architecture family, evaluation
+seeds), and measure how each primitive affects score and per-role
+attack/kill distributions.
 
-The Knights-Archers-Zombies environment \cite{terry2021pettingzoo} provides an
-ideal testbed: four cooperative agents (2 knights, 2 archers) must eliminate
-zombies while managing team health. The combination of close-range melee and
-ranged combat creates natural specialisation pressure, while the scoring
-function based on kills introduces a tension between individual efficiency and
-team preservation.
+\paragraph{Relationship to prior iterations.} An earlier iteration of
+this project (V1/V2, preserved on the \texttt{main} and
+\texttt{v2-death-penalty} branches) studied \emph{deterministic
+passivity}---a failure mode where stacking penalty-based constraints
+makes the stochastic policy fire while the argmax policy remains inert.
+V3 sets aside that narrative in favour of a positive-reinforcement
+progression and reuses only the MAPPO network family and the evaluation
+harness.
 
-Our contributions are:
+\paragraph{Contributions.}
 \begin{enumerate}[nosep]
-  \item A five-stage ablation demonstrating how constraint stacking drives
-    \emph{behavioural collapse} then \emph{recovery} in MAPPO agents.
-  \item Diagnosis of \emph{deterministic passivity}---a novel failure mode
-    where the stochastic policy learns to be aggressive but the deterministic
-    policy is passive---and its resolution via GRU recurrence.
-  \item An architectural progression from MLP to entity-attention to
-    attention+GRU, with empirical evidence that temporal memory is the key
-    ingredient for resolving passivity under partial observability.
-  \item Gradient-based saliency and attention weight visualisations
-    comparing where \gameone{} (MLP) and \gamefive{} (Attn+GRU) focus.
+  \item A seven-game ablation (\gz--\gv{}) that isolates ammo discipline,
+    role assignment, target locks, and pragmatic override under fixed
+    spawn rates and seeds.
+  \item A seed-paired evaluation protocol (identical zombie spawn pattern
+    across games) that enables direct attribution of score deltas to
+    primitives.
+  \item Quantitative evidence that role assignment is the most impactful
+    primitive (\gii{}$\to$\giii{}: +96\% stochastic score; +200\%
+    deterministic score) and that tighter lock rules can induce a
+    role-specific passivity pathology.
+  \item A training-free heuristic baseline covering three ammo regimes,
+    showing that the best learned policy (\giii{}) closes less than
+    half the gap to the unconstrained heuristic ceiling (\gz{}).
 \end{enumerate}
 
-% ── 2. Background ────────────────────────────────────────────────────────────
-\section{Background \& Related Work}
-\label{sec:background}
+\section{Background and Related Work}
+\label{sec:bg}
 
 \paragraph{MAPPO.} \citet{yu2022surprising} showed that Proximal Policy
-Optimisation \cite{schulman2017proximal} with shared parameters achieves
-competitive performance in cooperative MARL without the need for centralised
-critics or communication channels. We follow their shared-parameter formulation
-where all agents share a single actor-critic network.
+Optimisation \cite{schulman2017proximal} with shared parameters is a
+competitive baseline for cooperative MARL without centralised critics or
+inter-agent communication. We follow the shared-parameter formulation.
 
 \paragraph{Reward shaping.} \citet{ng1999policy} prove that potential-based
-reward shaping preserves the optimal policy under certain conditions. However,
-non-potential-based shaping (e.g.\ stamina penalties) can distort the optimal
-policy. Our ablation deliberately explores this distortion as a feature,
-demonstrating how over-constraining without architectural support induces
-passivity.
+shaping preserves the optimal policy; non-potential shaping can distort
+it. V3 uses minimal shaping and instead moves coordination into the
+wrapper, letting us study structure-vs-shaping in a controlled setting.
 
-\paragraph{Attention in MARL.} \citet{iqbal2019actor} introduced
-actor-attention-critic, using multi-head attention to dynamically weight agent
-contributions. We apply entity-level self-attention within each agent's
-observation (over the 27 entity slots) rather than across agents, providing
-permutation-invariant feature extraction.
+\paragraph{Attention and recurrence.} \citet{iqbal2019actor} introduced
+actor-attention-critic; \citet{vaswani2017attention}'s self-attention
+underpins our entity encoder, which operates over the per-agent
+\((27, 5)\) entity state. Recurrence via GRU
+\cite{cho2014learning, hausknecht2015deep} integrates role and lock
+features across the 450-step episode.
 
-\paragraph{Recurrent MARL.} \citet{hausknecht2015deep} demonstrated that GRU
-hidden states allow policies to integrate information across time steps in
-partially observable environments. We add a GRUCell after the attention encoder
-to integrate noisy observations from Gaussian fog across timesteps.
+\paragraph{CTDE baselines.} MADDPG \cite{lowe2017multi} and COMA
+\cite{foerster2018counterfactual} explicitly route gradient information
+between agents at training time. We intentionally stay decentralised so
+that the coordination signal flows through structural primitives.
 
-\paragraph{MADDPG \& counterfactual baselines.} \citet{lowe2017multi} and
-\citet{foerster2018counterfactual} use centralised training / decentralised
-execution (CTDE). We deliberately maintain a fully decentralised execution
-approach (shared parameters, local observations), focusing on emergent
-cooperation rather than centralised credit assignment.
+\paragraph{Environment.} KAZ is distributed with PettingZoo Butterfly
+\cite{terry2021pettingzoo}. It provides a permutation-invariant
+\((27, 5)\) entity vector per agent and a discrete 6-way action space
+(forward, backward, rotate CCW, rotate CW, attack, no-op).
 
-% ── 3. Environment ───────────────────────────────────────────────────────────
-\section{Environment \& Problem Setup}
+\section{Environment and Problem Setup}
 \label{sec:env}
 
-\subsection{Knights-Archers-Zombies (KAZ)}
+\subsection{KAZ v10}
 
-KAZ \cite{terry2021pettingzoo} is a parallel multi-agent environment with 4
-agents: 2 knights (melee) and 2 archers (ranged). Zombies spawn from the top
-of the screen and must be eliminated before reaching the bottom. Each agent
-observes an entity-centric vector of $27 \times 5 = 135$ features, encoding
-the type, health, $x$, $y$, and orientation of the 27 nearest entities (self,
-teammates, zombies, arrows). The action space has 6 discrete actions:
-\{move-forward, move-backward, rotate-left, rotate-right, attack, no-op\}.
+Four agents (2 archers, 2 knights) face zombies spawning at the top of a
+\(1280 \times 720\)-pixel arena. A \emph{failure} is a zombie that reaches
+the bottom. Episodes last 30 s at 15 FPS (450 steps). We report
+\(\text{score} = \text{kills} - \text{failures}\) per episode.
 
-\subsection{KAZWrapper: Game-Level Modifiers}
+\subsection{V3 wrapper}
 
-We implement a \texttt{KAZWrapper} that wraps PettingZoo's parallel API and
-applies game-level modifications:
+\texttt{KAZWrapperV3} takes a \texttt{game\_level} string and configures:
+ammo pools (off / global / individual), knight stamina pool,
+archer-immobile mode (\ga/\gb{} only), fixed role assignment, target
+lock acquisition, a \gv{} pragmatic-override rule, and a shared failure
+penalty. A single configuration table drives all seven games.
 
 \begin{table}[H]
 \centering
-\caption{Constraint stack applied cumulatively across game levels.}
-\label{tab:constraints}
-\begin{tabular}{@{}clllll@{}}
+\caption{Seven-game ablation. Each row adds one new primitive
+(in bold). Identical spawn rate, episode length, and evaluation seeds
+across all games.}
+\label{tab:games}
+\small
+\begin{tabular}{@{}llllc@{}}
 \toprule
-\textbf{Level} & \textbf{Death Pen.} & \textbf{Ammo} & \textbf{Stamina} & \textbf{Team Reward} & \textbf{Fog} \\
+\textbf{Game} & \textbf{Policy} & \textbf{Arch} & \textbf{New primitive} & \textbf{obs\_dim} \\
 \midrule
-G1 & $d{=}2.0$ & --- & --- & --- & --- \\
-G2 & $d{=}2.0$ & 15 arrows/ep & --- & --- & --- \\
-G3 & $d{=}2.0$ & 15 arrows/ep & $c_\text{move}{=}0.01$, $c_\text{atk}{=}0.05$ & --- & --- \\
-G4 & $d{=}2.0$ & 15 arrows/ep & $c_\text{move}{=}0.01$, $c_\text{atk}{=}0.05$ & 60/40 blend & --- \\
-G5 & $d{=}2.0$ & 15 arrows/ep & $c_\text{move}{=}0.01$, $c_\text{atk}{=}0.05$ & 60/40 blend & $\mathcal{N}(0, 0.3^2)$ \\
+\gz{}    & heuristic & --          & unrestricted baseline                    & 140 \\
+\ga{}    & heuristic & --          & \textbf{+global ammo, knight stamina, archer-immobile} & 140 \\
+\gb{}    & heuristic & --          & \textbf{individual ammo} (per archer)     & 140 \\
+\gii{}   & MAPPO     & Attn        & \textbf{learn under winning ammo mode}    & 140 \\
+\giii{}  & MAPPO     & Attn + GRU  & \textbf{roles} (1 forward, 1 patrol)      & 140 \\
+\giv{}   & MAPPO     & Attn + GRU  & \textbf{target locks} + cross-role skip   & 140 \\
+\gv{}    & MAPPO     & Attn + GRU  & \textbf{pragmatic override}               & 140 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The total shaped reward is:
+\subsection{Reward function}
+
+Base kill reward is KAZ's built-in \(+1\) per elimination by the agent.
+V3 adds three auxiliary terms:
 \begin{equation}
-r_i = w_s \cdot r_\text{aggression}^{(i)} + w_t \cdot \bar{r}_\text{team}^{(-i)} - d \cdot \mathbf{1}[\text{agent}_i \text{ dies}]
+r_i = r^{\text{kill}}_i
+    + b_r \cdot \mathbf{1}_{\text{roles\_on}} \cdot \phi_r(i)
+    + b_\ell \cdot \mathbf{1}_{\text{lock\_on}} \cdot \phi_\ell(i)
+    - p_f \cdot n_f^{(t)}
+    - p_m \cdot \mathbf{1}_{\text{invalid}}(a_i)
 \label{eq:reward}
 \end{equation}
-where $w_s = 0.6$, $w_t = 0.4$ (Games 4--5), $d$ is the death penalty (2.0 in
-V2, 0.0 in V1), and $\bar{r}_\text{team}^{(-i)}$ is the mean reward of agent
-$i$'s teammates. For Games 1--3, $w_s = 1$, $w_t = 0$.
+with \(b_r = 0.001,\; b_\ell = 0.002,\; p_f = 1.0,\; p_m = 0.05\).
+\(\phi_r(i) = \mathbf{1}\{\text{agent $i$ is in its assigned zone}\}\),
+\(\phi_\ell(i) = \mathbf{1}\) iff \(i\) attacked while holding a valid
+lock. \(n_f^{(t)}\) is the number of zombies that crossed this step
+(shared across living agents).
 
-% ── 4. Methods ───────────────────────────────────────────────────────────────
+\subsection{Observation augmentation}
+
+Each agent's KAZ observation (shape \((27, 5)\)) is appended with a 5-dim
+extras row encoding \{role\_id, in\_end\_zone, ammo\_frac,
+stamina\_frac, has\_lock\}, giving a flat observation of 140 dimensions
+identical across all seven games. This preserves checkpoint compatibility
+and lets transfer-learning across \gii--\gv{} copy 22+ / 32 tensors.
+
+\subsection{Action masking}
+
+V3 supports both \emph{soft} (penalty) and \emph{hard} (forced no-op)
+masking for invalid actions. All experiments use soft masking to keep
+gradients informative; a direction-aware hard mask additionally prevents
+patrol-knight boundary crossings when \texttt{lock\_on} is set.
+
 \section{Methods}
 \label{sec:methods}
 
-\subsection{MAPPO with Shared Parameters}
+\subsection{Shared-parameter MAPPO with extras}
 
-All agents share a single \texttt{MAPPONet} actor-critic backbone. Each agent
-independently observes its local observation $o_i \in \mathbb{R}^{135}$,
-produces a discrete action distribution $\pi_\theta(a_i \mid o_i)$, and a
-scalar value estimate $V_\phi(o_i)$. We use the clipped PPO objective:
-\begin{equation}
-\mathcal{L}_\text{PPO} = \mathbb{E}_t\left[\min\left(
-  r_t(\theta)\hat{A}_t,\;
-  \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\hat{A}_t
-\right)\right]
-\end{equation}
-with entropy bonus $\mathcal{L}_\text{ent} = \beta H[\pi_\theta(\cdot \mid o_t)]$
-and entropy floor: $\beta \leftarrow 2\beta$ if $H < H_\text{min}$.
+All four agents share a single actor-critic network. We use the clipped
+PPO objective with GAE. The encoder splits the 140-d observation into
+the KAZ entity block (\(27 \times 5\)) and the 5-d extras:
+\[
+\mathbf{z}_t = \underbrace{\mathrm{Pool}(\mathrm{MHA}(E(\mathrm{obs}_t)))}_{\text{entity attention}}
+\;+\; W_{\text{extra}}\,\mathrm{extras}_t
+\]
+with a mean pool over non-padded entity slots. For \giii--\gv{} we pass
+\(\mathbf{z}_t\) through a GRUCell,
+\(\mathbf{h}_t = \mathrm{GRUCell}(\mathbf{z}_t, \mathbf{h}_{t-1})\),
+with per-agent hidden state reset at episode boundaries.
 
-\subsection{Architecture Evolution}
+\paragraph{Transfer learning.} \giii{} transfers 28 / 32 tensors from
+\gii{} (the 4 GRU parameter tensors are new); \giv{} and \gv{} each
+transfer all 32 / 32 from their predecessor.
 
-\paragraph{Games 1--3: MLP Backbone.}
-A 3-layer MLP: $\text{Linear}(135, 256) \to \text{ReLU} \to
-\text{Linear}(256, 256) \to \text{ReLU} \to \text{Linear}(256, 256)$.
-Shared actor/critic heads sit on top. Total: $\approx$200K parameters.
+\subsection{Heuristic baselines}
 
-\paragraph{Game 4: Entity Self-Attention (MLP + Attn).}
-The observation is reshaped to $(27, 5)$ entity slots. An
-\texttt{EntityAttentionEncoder} projects each slot to 256-d, applies 4-head
-self-attention with masking of empty slots, then mean-pools attended features.
-\begin{equation}
-\mathbf{z} = \frac{1}{|\mathcal{A}|}\sum_{i \in \mathcal{A}} \text{Attn}(E(e_i), E(\mathbf{e}), E(\mathbf{e}))
-\end{equation}
-where $\mathcal{A}$ is the set of non-empty entity slots and $E$ is the entity
-embedding. Total: $\approx$467K parameters.
+A scripted policy queries the wrapper for the nearest zombie, aims,
+and fires. Knights walk forward when aligned and attack within 60 px.
+Ammo and stamina are respected. The heuristic never uses the policy
+network, giving a training-free ceiling (\gz{}) and two constrained
+floors (\ga/\gb{}). The ammo pool mode (global vs individual) for
+\gii--\gv{} is picked automatically by comparing \ga{} and \gb{}
+scores.
 
-\paragraph{Game 5: Attention + GRU (attention\_gru).}
-A GRUCell$(256, 256)$ is appended after the attention pooling:
-\begin{equation}
-\mathbf{h}_t = \text{GRUCell}(\mathbf{z}_t, \mathbf{h}_{t-1}), \quad \mathbf{h}_0 = \mathbf{0}
-\end{equation}
-Hidden states are maintained per-agent across rollout steps and reset at
-episode boundaries. Transfer learning initialises 26/26 compatible tensors from
-the \gamefour{} checkpoint. Total: 825,481 parameters.
-
-\subsection{Training Details}
+\subsection{Training budget}
 
 \begin{table}[H]
 \centering
-\caption{Shared training hyperparameters across all games.}
-\label{tab:hparams}
-\begin{tabular}{@{}lll@{}}
+\caption{Training budget (RTX 5070 Ti, $\approx$480 SPS).}
+\label{tab:budget}
+\small
+\begin{tabular}{@{}llrrl@{}}
 \toprule
-\textbf{Hyperparameter} & \textbf{Value} & \textbf{Notes} \\
+\textbf{Game} & \textbf{Arch} & \textbf{Steps} & \textbf{Params} & \textbf{Transfer} \\
 \midrule
-Total timesteps & 1,000,000--2,000,000 & V2: G1--G3: 1M, G4: 1.5M, G5: 2M \\
-Death penalty $d$ & 2.0 & V2: all games; V1: 0.0 \\
-Max cycles / episode & 900 & \\
-Rollout steps & 2048 & \\
-Mini-batch size & 512 & \\
-PPO epochs & 4 & \\
-Clip $\epsilon$ & 0.2 & \\
-Entropy coef $\beta$ & 0.01 (init) & Floor: $\times 2$ if $H < H_\text{min}$ \\
-Value coef & 0.5 & \\
-Learning rate & $3\times10^{-4}$ & Adam \\
-$\gamma$ (discount) & 0.99 & \\
-GAE $\lambda$ & 0.95 & \\
-Hardware & RTX 5070 Ti & CUDA, float32 \\
+\gii{}   & Attn        & 1\,000\,000 & 432\,265 & scratch \\
+\giii{}  & Attn + GRU  & 1\,500\,000 & 827\,017 & 28 / 32 from \gii{} \\
+\giv{}   & Attn + GRU  & 1\,500\,000 & 827\,017 & 32 / 32 from \giii{} \\
+\gv{}    & Attn + GRU  & 2\,000\,000 & 827\,017 & 32 / 32 from \giv{} \\
+\midrule
+Total    &             & 6\,000\,000 &          & $\approx$3.5 h wall-clock \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% ── 5. Experiments ───────────────────────────────────────────────────────────
+Hyper-parameters: lr $3\times 10^{-4}$, $\gamma = 0.99$,
+$\lambda_{\text{GAE}} = 0.95$, clip $\epsilon = 0.2$, entropy coef.
+$\beta = 0.01$, rollout 2048 steps, mini-batch 512, 4 PPO epochs,
+\(\|\nabla\theta\| \le 0.5\).
+
 \section{Experiments}
 \label{sec:experiments}
 
-\subsection{Game 1 --- The Greedy Soldier}
-\textit{Constraint: Kill reward only. Architecture: MLP.}
+We evaluate every game on 10 episodes with seeds \(42, 43, \dots, 51\);
+because episode \(i\) uses the same seed across every game, zombie
+spawn patterns are identical across games. Learned games (\gii--\gv{})
+additionally run 10 deterministic (argmax) episodes.
 
-The baseline agent maximises kills without constraint. With infinite ammo and
-no resource costs, the agent learns to continuously attack, achieving a raw
-kill density of $\mathbf{0.01051}$ kills/step (V2)---the highest across all
-games and essentially unchanged from V1 ($0.01089$). The death penalty ($d=2.0$)
-has negligible impact on \gameone{} because agents that fight aggressively
-accumulate enough kill reward to offset the penalty. Mean return drops from
-$5.80$ (V1) to $3.98$ (V2) due to the penalty itself, not behavioural change.
-
-\subsection{Game 2 --- The Risk Avoider}
-\textit{Constraint: +Ammo limit (15 arrows/episode). Architecture: MLP.}
-
-Ammo scarcity creates a negative feedback loop: each missed shot costs the
-archer both an arrow and a future kill opportunity. The agent learns to \emph{
-not shoot} by default, reducing raw kill density by 71\% to $0.00308$ (V2).
-The death penalty compounds the avoidance behaviour: agents pay $-2.0$ for
-dying but lack the representational capacity to convert ``don't die'' into
-``fight back.'' Episode length drops to 203 steps as passive agents are overrun.
-
-\subsection{Game 3 --- The Fully Passive}
-\textit{Constraint: +Stamina decay ($c_\text{move}=0.01$, $c_\text{atk}=0.05$). Architecture: MLP.}
-
-Stamina penalties on movement and attacks compound the risk-avoidance
-behaviour. Even with death penalty $d=2.0$, the MLP policy collapses to
-near-complete passivity: raw kill density $0.00297$ (V2), a 72\% reduction
-from \gameone{}. Under deterministic evaluation, raw kills are exactly $0.00$
-across all 10 episodes---the phenomenon we term \emph{deterministic passivity}.
-\textbf{This is the key V2 finding for G3: death penalty alone does not fix
-passivity.} The MLP lacks the capacity to translate a survival incentive into
-aggressive action.
-
-\subsection{Game 4 --- The Recovering Cooperator}
-\textit{Constraint: +60/40 team-health reward. Architecture: MLP + Entity Attention.}
-
-The team-health component introduces a cooperative signal: agents now benefit
-from teammates' kills. The entity self-attention enables dynamic weighting of
-nearby entities. Kill density is $0.00298$ (V2) with preservation signals
-emerging ($\bar{r}_\text{pres} = 0.575$). However, \emph{deterministic
-passivity persists}: deterministic raw kills are $0.00$ per episode---identical
-to \gamethree. Death penalty + attention is insufficient without temporal
-memory.
-
-\subsection{Game 5 --- Fire Discipline}
-\textit{Constraint: +Gaussian fog ($\sigma=0.3$). Architecture: MLP + Attention + GRU.}
-
-The GRU hidden state allows agents to integrate noisy observations across
-timesteps, building a temporal consensus about entity locations. Transfer
-learning from \gamefour{} provides warm-start weights. \gamefive{} is the
-only game where death penalty produces a \emph{positive} effect: V2 raw kill
-density $0.00373$ (+25\% vs V1's $0.00299$), the highest of any constrained
-game. Deterministic evaluation shows $0.33$ raw kills/episode (vs $0.00$ for
-G2--G4), with preservation at $+0.325$. The GRU converts the survival signal
-into active behaviour that the MLP cannot.
-
-% ── 6. Results ───────────────────────────────────────────────────────────────
-\section{Results \& Analysis}
-\label{sec:results}
-
-\subsection{Ablation Summary}
+\subsection{Scores}
 
 \begin{table}[H]
 \centering
-\caption{V2 ablation results (death penalty $d{=}2.0$) across all five games.
-10 episodes each (stochastic and deterministic). Kill density = raw kills /
-episode steps. Det.\ Raw Kills = mean raw kills under argmax policy.}
-\label{tab:ablation}
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}llccccccc@{}}
+\caption{Main ablation table (10 episodes/game, seed
+\(42 + \text{ep\_idx}\)). Bold highlights the best stochastic score
+(\giii{}) and the best deterministic score (\giv{}).}
+\label{tab:main}
+\small
+\begin{tabular}{@{}lllllr@{}}
 \toprule
-\textbf{Game} & \textbf{Label} & \textbf{Mean Return} & \textbf{Raw Kill Den.}
-  & \textbf{Kill Den.} & \textbf{Preservation} & \textbf{Ep.\ Length}
-  & \textbf{Det.\ Raw Kills} & \textbf{Arch.} \\
+\textbf{Game} & \textbf{Stoch. score} & \textbf{Det. score} & \textbf{\%Ammo} & \textbf{\%Stamina} & \textbf{Failures} \\
 \midrule
-G1 & Greedy Soldier        & $3.98 \pm 3.80$ & 0.01051 & 0.01051 & 0.000 & 530 & 0.70 & MLP \\
-G2 & Risk Avoider          & $-1.75 \pm 0.52$ & 0.00308 & 0.00123 & 0.000 & 203 & 0.05 & MLP \\
-G3 & Fully Passive         & $-1.82 \pm 0.40$ & 0.00297 & 0.00097 & 0.000 & 185 & 0.00 & MLP \\
-G4 & Recovering Cooperator & $-1.62 \pm 0.39$ & 0.00298 & 0.00133 & 0.575 & 193 & 0.00 & MLP+Attn \\
-G5 & Fire Discipline (sto.)& $-2.07 \pm 0.38$ & 0.00373 & $-0.003$ & 0.675 & 181 & ---         & Attn+GRU \\
-G5 & Fire Discipline (det.)& $-2.06 \pm 0.24$ & 0.00182 & $-0.002$ & 0.325 & 179 & 0.33 & Attn+GRU \\
+\gz{}    & 10.10 $\pm$ 4.11 & --                 & 0.00 & 0.00 & 0.0 \\
+\ga{}    & 3.70 $\pm$ 1.19  & --                 & 0.66 & 0.99 & 0.0 \\
+\gb{}    & 3.70 $\pm$ 1.19  & --                 & 0.64 & 0.99 & 0.0 \\
+\gii{}   & 2.40 $\pm$ 0.66  & 0.80 $\pm$ 0.75    & 1.00 & 0.88 & 0.0 \\
+\giii{}  & \textbf{4.70 $\pm$ 1.49} & 2.40 $\pm$ 1.28 & 1.00 & 0.98 & 0.0 \\
+\giv{}   & 3.90 $\pm$ 0.70  & \textbf{2.70 $\pm$ 1.27} & 1.00 & 0.92 & 0.0 \\
+\gv{}    & 3.50 $\pm$ 1.28  & 2.60 $\pm$ 0.92    & 0.93 & 0.96 & 0.0 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
-\subsection{Kill Density Trajectory}
-
-Figure~\ref{fig:evolution} shows the G1$\to$G5 behavioural trajectory. Raw kill
-density collapses from G1 to G3 as constraints pile on, flatlines through G4
-(attention alone insufficient), then recovers at G5 where GRU temporal memory
-unlocks the death penalty signal. G5's raw kill density ($0.00373$) is the
-highest of any constrained game---a +25\% improvement over V1 ($0.00299$).
-
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\linewidth]{../results/kill_density_evolution.png}
-\caption{Left: Raw kill density trajectory G1$\to$G5. Right: Mean preservation
-(team-health) reward per game. The 60/40 weighting activates at G4, unlocking
-cooperative preservation signals. G5 maintains both aggression and
-preservation simultaneously.}
-\label{fig:evolution}
+\includegraphics[width=0.9\linewidth]{../results/v3/score_evolution.png}
+\caption{Score evolution across the seven games. \gz{} (unconstrained
+heuristic) is the ceiling; learned games peak at \giii{}, then
+decline as tighter coordination rules are layered on.}
+\label{fig:score}
 \end{figure}
 
-\subsection{Diagnosing Deterministic Passivity}
+\subsection{Kills and attacks}
 
-Deterministic passivity occurs when the entropy of the stochastic policy is
-distributed over many actions, but the \emph{mode} (argmax) consistently
-selects a low-reward non-attack action. This is distinct from the agent
-``giving up''---the stochastic policy still produces attacks with non-trivial
-probability---but the deterministic policy (as used in deployment) is
-completely passive.
-
-Root cause: strong penalty signals (ammo waste, stamina cost) shift the
-reward gradient such that the policy mass around attack actions is lower than
-around no-op/movement. Under softmax with temperature $T=1$, the most probable
-action is often \textit{no-op}, even though the expected value of attacking
-may be positive when weighted across trajectories.
-
-\paragraph{V2 death penalty experiment.} Adding $d=2.0$ death penalty was
-hypothesised to fix this by making ``die passively'' (net $-2.0$) worse than
-``kill and survive'' (net $+1.0$). Result: \textbf{MLP agents still collapse.}
-G3 deterministic raw kills remain $0.00$ per episode. The MLP lacks the
-representational capacity to translate a survival incentive into aggressive
-action under constraint pressure.
-
-\gamefive{}'s resolution: the GRU hidden state accumulates temporal evidence
-about entity positions across noisy observations. After 2--5 timesteps of
-consistent zombie presence in the vicinity, the hidden state encodes enough
-certainty that the policy mode shifts to \textit{attack}. Crucially, the death
-penalty \emph{does} help G5: V2 raw kill density $0.00373$ (+25\% vs V1),
-suggesting that the GRU provides the capacity to \emph{use} the survival
-signal that MLP models ignore.
-
-\subsection{Stress Test: Robustness to Spawn Pressure}
+\begin{table}[H]
+\centering
+\caption{Per-class kills and attacks (stochastic eval). ``A'' = archers,
+``K'' = knights, totals summed across both agents of that class per
+episode.}
+\label{tab:kills}
+\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Game} & \textbf{Kills A} & \textbf{Kills K} & \textbf{Attacks A} & \textbf{Attacks K} \\
+\midrule
+\gz{}    & 4.5 & 5.6 & 444.8 & 13.8 \\
+\ga{}    & 0.6 & 3.1 & 20.0  & 5.7 \\
+\gb{}    & 0.6 & 3.1 & 19.1  & 5.7 \\
+\gii{}   & 2.3 & 0.1 & 33.0  & 56.3 \\
+\giii{}  & 4.4 & 0.3 & 38.2  & 28.9 \\
+\giv{}   & 3.9 & 0.0 & 36.9  & 0.2 \\
+\gv{}    & 3.5 & 0.0 & 30.2  & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.88\linewidth]{../results/collapse_graph.png}
-\caption{Performance of G1 (unconstrained env) and G5 (fog+ammo+stamina env)
-under increasing zombie spawn pressure. Left: raw kills per episode. Right:
-kill density normalised to each model's 1.0$\times$ training baseline.
-G5 degrades more gracefully despite operating in a harder base environment
-with 3 additional constraints active.}
-\label{fig:collapse}
+\includegraphics[width=0.9\linewidth]{../results/v3/metric_breakdown.png}
+\caption{Four-panel breakdown. Top: ammo / stamina utilisation. Bottom:
+per-class kills and attacks. Knight attacks (bottom right) drop to
+$\approx 0$ in \giv{}/\gv{}, the signature of the knight-passivity
+regime.}
+\label{fig:breakdown}
 \end{figure}
 
-Each model is evaluated on its own training environment (G1: no constraints;
-G5: all constraints active). Importantly, the obs-dim difference (110 for G1,
-135 for G5) prevents a direct same-environment comparison---this is itself
-evidence of how significantly the two policies diverged during training.
-Normalised kill density (Figure~\ref{fig:collapse}, right) shows G5's relative
-degradation under pressure is smaller, attributable to GRU memory compensating
-for increased observation ambiguity.
-
-% ── 7. Explainability ────────────────────────────────────────────────────────
-\section{Explainability}
-\label{sec:explain}
-
-\subsection{G1: Gradient-Based Saliency}
-
-For the MLP policy (\gameone), we compute input gradient saliency: the absolute
-partial derivative of the selected action logit with respect to each input
-feature, averaged over entity slots:
-\begin{equation}
-s_j = \frac{1}{T}\sum_{t=1}^{T} \left\|\frac{\partial \log \pi(a^*_t \mid o_t)}{\partial \mathbf{e}_j}\right\|_1 \cdot \mathbf{1}[\mathbf{e}_j \neq \mathbf{0}]
-\end{equation}
-The MLP's saliency concentrates heavily on a small number of entity slots
-(Figure~\ref{fig:saliency}, left), consistent with nearest-enemy tunnel
-vision---the agent attends to the single most threatening entity and largely
-ignores teammates.
-
-\subsection{G5: Self-Attention Weight Visualisation}
-
-For \gamefive{}, we capture the $27 \times 27$ self-attention weight matrix
-$\mathbf{W}_\text{attn}$ from the \texttt{EntityAttentionEncoder} via a
-registered forward hook, averaged over 200 steps. Column-wise summation reveals
-which entity slots are most \emph{attended to} across all query positions.
-
-The attention distribution (Figure~\ref{fig:saliency}, centre and right) is
-notably more distributed than G1's saliency, spanning teammate slots as well as
-zombie slots. The attention matrix heatmap (right) shows structured off-diagonal
-patterns indicating cross-entity reasoning rather than self-attending only.
-Attention sum of 27.0 (one per entity row, each softmax row summing to 1)
-confirms well-formed attention weights.
+\subsection{Attention saliency}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{../results/saliency_comparison.png}
-\caption{Explainability visualisations. Left: G1 MLP gradient saliency
-(entity-slot importance). Centre: G5 attention weight column sums (how much
-each entity is attended to). Right: G5 full $27{\times}27$ attention matrix
-averaged over 200 steps. G5 distributes attention across multiple entity slots
-including teammates, while G1 concentrates on a few proximal threats.}
+\includegraphics[width=0.9\linewidth]{../results/v3/saliency_v3.png}
+\caption{Entity-attention weights for \giii{} (left) vs \gv{} (right),
+sampled from the first agent after 30 warm-up steps. \giii{}'s attention
+concentrates on a handful of entity slots (mostly nearby zombies);
+\gv{}'s attention spreads more broadly, consistent with its need to
+track knight lock targets as well as its own candidates.}
 \label{fig:saliency}
 \end{figure}
 
-% ── 8. Discussion ────────────────────────────────────────────────────────────
+\subsection{Side-by-side demo}
+
+A side-by-side video \texttt{results/v3/demo\_sidebyside\_v3.mp4}
+compares \gz{} (left, heuristic) with \gv{} (right, learned) on seed 42.
+It illustrates the qualitative difference between an unrestricted
+fire-rate archer that tries to cover the whole screen and a learned
+policy that uses only 93\% of its ammo while respecting locks.
+
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{The Constraint Trap.} Our results demonstrate a fundamental tension
-in reward shaping for MARL: each constraint individually motivates a
-desirable safety behaviour (ammo conservation, energy management), but their
-cumulative effect can suppress the very aggression that makes the agent useful.
-Without architectural support, the policy finds the locally safe solution: do
-nothing. The V2 death penalty experiment sharpens this finding: even an
-explicit survival incentive ($d=2.0$) cannot overcome the trap without
-architectural capacity to act on it.
+\subsection{Roles give the biggest lift}
 
-\paragraph{Architecture is not enough---but reward helps with the right
-architecture.} Entity attention in \gamefour{} improves feature extraction but
-cannot resolve deterministic passivity. However, the death penalty \emph{does}
-amplify G5's GRU-enabled aggression (+25\% raw kill density). This suggests
-that reward signals and architecture are \emph{complementary}: neither is
-sufficient alone, but together they produce the strongest constrained-game
-performance.
+Adding role assignment + GRU (\giii{}) raises stochastic score from
+\(2.40 \to 4.70\) (+96\%) and doubles the deterministic score. No
+reward magnitude was changed between \gii{} and \giii{}: the only
+differences were (i) the patrol/forward role\_id feature, (ii) the tiny
+role bonus \(b_r = 10^{-3}\), and (iii) the addition of a GRUCell.
 
-\paragraph{Transfer learning efficiency.} Loading 26 compatible weight tensors
-from \gamefour{} to \gamefive{} (excluding the GRU parameters) significantly
-accelerated G5 training. The entity embedding and attention layers transferred
-cleanly, suggesting that entity-level representations are robust to the
-addition of Gaussian observation noise.
+Why roles help is intuitive in hindsight. In \gii{}, both knights chase
+the nearest zombie; their attack budget is spent on overlapping targets
+(56.3 attacks/episode shared, converting to 0.1 kills). In \giii{} the
+patrol knight is anchored to the end zone and only attacks zombies that
+arrive there, while the forward knight moves freely. Attack budget drops
+to 28.9/episode and archer kills rise to 4.4.
 
-\paragraph{Observation dimension discrepancy.} G1 was trained on an environment
-producing 110-dimensional observations (22 entity slots) while G4/G5 used 135
-dimensions (27 entity slots). This divergence, likely caused by different
-\texttt{max\_cycles} or wrapper parameter defaults between training runs,
-prevents direct cross-environment evaluation but does not affect within-game
-validity.
+\subsection{Locks cause knight passivity}
 
-% ── 9. Conclusion ────────────────────────────────────────────────────────────
+\giv{} and \gv{} lower the learned score despite transferring from
+\giii{} and continuing to train for 1.5--2M more steps. Inspection of
+Table~\ref{tab:kills} tells the story: knights attack 0.2--0.5
+times/episode, vs 28.9 in \giii{}. The 15\%-width lock radius
+(\(192\) px) combined with the patrol constraint means a knight only
+sees one or two lockable targets per episode.
+
+This is not a negative result in the colloquial sense: we \emph{learned}
+that the specific lock radius we picked is too tight. The experiment
+isolates the loss to one primitive, and the remediation path is clear
+(Section~\ref{sec:future}).
+
+\subsection{Reversing V1/V2's deterministic passivity}
+
+V1/V2 reported that stacking penalty constraints made the argmax
+(deterministic) policy nearly inert while the stochastic policy still
+fired. In V3 the opposite is observed: deterministic scores
+\emph{increase} along the progression (\gii{} \(0.80 \to\) \gv{}
+\(2.60\)). Our interpretation is that the structural primitives
+(especially roles) give the policy a scaffolding that the argmax mode
+can commit to, whereas penalty stacking makes every action look dangerous
+at test time.
+
+\subsection{Zero failures throughout}
+
+Across all 70 evaluation episodes, \(n_f = 0\). The failure penalty
+\(p_f = 1.0\) therefore never fires during evaluation, which means the
+reward shaping term is effectively unused at test time. This is expected
+(default spawn rate is easy relative to 4 agents with stamina pools) but
+it also means we cannot claim that our agents have learned to defend
+\emph{under pressure}; they have learned to coordinate at a pressure
+level where failure is cheap.
+
+\subsection{Ammo mode tie}
+
+\ga{} and \gb{} produced identical scores to two decimal places
+(\(3.70 \pm 1.19\)). The orchestration script picks ``global'' by a
+deterministic \(\ge\) tiebreak, so \gii--\gv{} are trained under a
+shared 30-arrow pool. A separate run under individual ammo would be a
+clean follow-up experiment.
+
+\section{Limitations and Future Work}
+\label{sec:future}
+
+\begin{enumerate}[nosep]
+\item \textbf{Lock radius sweep.} Scan lock radius in
+  \(\{0.15, 0.20, 0.25, 0.30\} \cdot W\) to locate the transition point
+  at which knights stop being passive.
+\item \textbf{Spawn-rate stress test.} Rerun the ablation at spawn rates
+  \(0.7\times, 1.4\times, 2.0\times\) default; this activates the
+  failure penalty and lets us observe degradation curves per primitive.
+\item \textbf{Per-role heads.} Split the shared policy into per-role
+  heads (shared trunk, two heads for forward/patrol knight, one for
+  archer). Might remove the need for the role\_id observation feature
+  and reduce interference.
+\item \textbf{Learned pragmatic override.} Replace the deterministic
+  G5 override rule with a learned gating policy. Our current
+  implementation hard-codes the cross-vs-intercept calculation;
+  letting the archer's policy learn when to override may reveal richer
+  coordination patterns.
+\item \textbf{Individual-ammo ablation.} Run \gii--\gv{} under
+  individual ammo to test sensitivity to the \ga/\gb{} tiebreak.
+\end{enumerate}
+
 \section{Conclusion}
-\label{sec:conclusion}
 
-We have demonstrated that progressive reward shaping drives MAPPO agents
-through a predictable behavioural trajectory: Greedy Soldier $\to$ Risk
-Avoider $\to$ Fully Passive $\to$ Recovering Cooperator $\to$ Fire Discipline.
-The critical transition from Fully Passive to Fire Discipline requires not just
-better rewards but better architecture: specifically, GRU temporal memory to
-integrate noisy observations into committed action decisions.
+We presented a seven-game ablation on PettingZoo KAZ that isolates four
+coordination primitives and measures their individual contribution to
+score, per-class kills, and attack budgets. Role assignment is the
+single biggest structural win (+96\% over a constrained learned
+baseline); tighter locks were harmful at the radius we chose; and
+deterministic scores improve along the progression, reversing V1/V2's
+deterministic-passivity regime.
 
-The key finding is the identification and resolution of \emph{deterministic
-passivity}, a previously under-described failure mode in constrained cooperative
-MARL. The V2 death penalty experiment provides a clean ablation: the same
-survival incentive ($d=2.0$) fails in MLP models (G2--G3: zero deterministic
-kills) but succeeds in the GRU model (G5: $0.33$ kills/episode, $+25\%$ raw
-kill density vs V1). This confirms that architectural capacity is the
-bottleneck, and that reward shaping and architecture are complementary tools.
+The full implementation, training pipeline, evaluation harness, and all
+artifacts are available in the project repository
+(\texttt{v3-overhaul} branch). The ablation protocol---identical seeds
+across games, a soft-mask wrapper, and seed-paired stochastic +
+deterministic evaluations---is designed to be easy to extend to additional
+primitives without invalidating previously trained checkpoints.
 
-\paragraph{Future Work.}
-\begin{itemize}[nosep]
-  \item \emph{Cross-game evaluation}: standardise all games to the same
-    observation space to enable direct policy transfer evaluation.
-  \item \emph{Communication channels}: test whether explicit inter-agent
-    messaging can replace temporal memory as a passivity resolver.
-  \item \emph{Centralised training}: compare decentralised MAPPO against
-    MADDPG \cite{lowe2017multi} or QMIX under the same constraint stack.
-  \item \emph{Adaptive entropy floor}: learn the entropy coefficient rather
-    than using a fixed doubling heuristic.
-  \item \emph{Curriculum fog}: gradually increase fog sigma during training
-    rather than applying full $\sigma=0.3$ from step 0.
-\end{itemize}
-
-% ── References ───────────────────────────────────────────────────────────────
 \bibliographystyle{plainnat}
 \bibliography{references}
 

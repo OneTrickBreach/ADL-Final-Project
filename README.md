@@ -1,258 +1,193 @@
-# The Evolution of Fire Discipline
-### ADL CS7180 Final Project — 5-Game MARL Ablation Study
+## Structured Teamwork in Multi-Agent PPO
+### ADL CS7180 Final Project — V3 Overhaul: A 7-Game Study of Coordination Primitives
 
 **Team:** Ishan Biswas, Elizabeth Coquillette, Nishant Suresh
+**Branch of record:** `v3-overhaul`
 
 ---
 
-## What This Project Does
+## 1. What this project does
 
-A complete multi-agent reinforcement learning study using **MAPPO** on the PettingZoo **Knights, Archers & Zombies (KAZ)** environment. Five games are trained in sequence, each adding exactly one new constraint, to trace how reward shaping and architecture drive the emergence of coordinated behavior — from a mindlessly aggressive baseline to a disciplined tactical unit that operates under resource limits, teammate awareness, and perceptual fog.
+A controlled 7-game ablation on PettingZoo's **Knights-Archers-Zombies (KAZ)** that
+isolates the contribution of four coordination primitives to cooperative MARL
+performance:
 
-**V2 design iteration:** Added a configurable **death penalty** (−2.0 per agent death) to test whether a survival incentive alone could fix the passivity trap. **It cannot** — MLP agents (G2–G3) remain fully passive even with death penalty. Only GRU temporal memory (G5) converts the survival signal into active behavior, confirming that architectural capacity is the bottleneck, not reward magnitude.
+1. **Ammo / stamina discipline** — forces agents to value each action.
+2. **Role assignment** (forward knight vs. patrol knight) — divides labour spatially.
+3. **Target locks** — prevents duplicate targeting between classes.
+4. **Pragmatic override** — reintroduces flexibility when rules would cost the team.
 
-**Central finding:** *Deterministic passivity* — a previously under-described MARL failure mode where the stochastic policy attacks but the argmax (deployment) policy is completely passive. Death penalty alone is insufficient; Game 5's GRU temporal memory resolves it, achieving non-zero deterministic kills vs 0 kills in Games 2–4.
+All seven games are evaluated on **identical zombie patterns** (same seed per episode)
+so that score differences isolate the effect of each primitive. Games G0–G1b are
+**scripted heuristic baselines**; G2–G5 are trained with shared-parameter **MAPPO**
+(PPO + GAE) using an entity self-attention encoder (G2) or attention + GRU (G3–G5).
 
----
-
-## Results at a Glance
-
-| Game | Label | Mean Return | Raw Kill Density | Det. Raw Kills | Architecture |
-|------|-------|-------------|-----------------|---------------|-------------|
-| G1 | Greedy Soldier | 3.98 ± 3.80 | **0.01051** | 0.70/ep | MLP |
-| G2 | Risk Avoider | −1.75 ± 0.52 | 0.00308 | **0.05/ep** ← passive | MLP |
-| G3 | Fully Passive | −1.82 ± 0.40 | 0.00297 | **0.00/ep** ← collapse | MLP |
-| G4 | Recovering Cooperator | −1.62 ± 0.39 | 0.00298 | **0.00/ep** ← persists | MLP + Attention |
-| G5 | **Fire Discipline** | −2.07 ± 0.38 | **0.00373** | **0.33/ep** ← GRU helps | Attn + GRU |
-
-> **V2:** All games trained with `--death_penalty 2.0`. Mean returns are lower (penalty subtracts). Compare raw kill density across games.  
-> **G5 details (stochastic):** preservation +0.675, ep length 181 steps, 2,007,048 training steps, 825,481 parameters
-
----
-
-## Constraint Stack
-
-| Level | Death Penalty | Ammo Limit | Stamina Decay | 60/40 Team Reward | Gaussian Fog |
-|-------|:------------:|-----------|---------------|-------------------|-------------|
-| G1 | ✅ 2.0 | — | — | — | — |
-| G2 | ✅ 2.0 | ✅ 15 arrows/ep | — | — | — |
-| G3 | ✅ 2.0 | ✅ | ✅ move −0.01, attack −0.05 | — | — |
-| G4 | ✅ 2.0 | ✅ | ✅ | ✅ | — |
-| G5 | ✅ 2.0 | ✅ | ✅ | ✅ | ✅ σ=0.3 |
+> **Relationship to V1/V2.** Earlier iterations on `main` explored the
+> "deterministic-passivity" failure mode from stacking penalty constraints. V3
+> replaces that narrative with a cleaner positive-reinforcement story: observe
+> how much performance comes from *structure* once constraints are fixed and
+> shared across all games.
 
 ---
 
-## Architecture Evolution
+## 2. The 7 games
 
+| Game | Name                  | Learner?     | Arch            | New primitive added                                                  |
+|------|-----------------------|--------------|-----------------|----------------------------------------------------------------------|
+| G0   | Unrestricted          | heuristic    | —               | baseline; no ammo/stamina                                            |
+| G1a  | Global-pool ammo      | heuristic    | —               | shared ammo, knight stamina, archers immobile                        |
+| G1b  | Individual-pool ammo  | heuristic    | —               | per-archer ammo, stamina, archers immobile                           |
+| G2   | Basic teamwork        | MAPPO        | Attention       | ammo-discipline learned (best of G1a/G1b mode, selected automatically) |
+| G3   | Role assignment       | MAPPO + TL   | Attention + GRU | 1 forward knight, 1 end-zone patrol knight                           |
+| G4   | Target locks          | MAPPO + TL   | Attention + GRU | knight lock radius; archer skips knight-locked zombies               |
+| G5   | Pragmatic override    | MAPPO + TL   | Attention + GRU | archer overrides knight lock if zombie will cross first              |
+
+*TL = transfer-learning from previous game's final checkpoint.*
+
+Every episode lasts **30 seconds (450 steps @ 15 FPS)**; we report **score = kills − failures**,
+where a *failure* is a zombie that reaches the bottom of the screen.
+
+---
+
+## 3. Headline results
+
+*10 evaluation episodes per game, seed 42+ep_idx, zombies identical across games.*
+
+| Game | Stochastic score | Deterministic score | %Ammo | %Stamina | Kills (A / K) | Failures |
+|------|------------------|---------------------|-------|----------|---------------|----------|
+| G0   | **10.10 ± 4.11** | —                   | 0.00  | 0.00     | 4.5 / 5.6     | 0.0      |
+| G1a  | 3.70 ± 1.19      | —                   | 0.66  | 0.99     | 0.6 / 3.1     | 0.0      |
+| G1b  | 3.70 ± 1.19      | —                   | 0.64  | 0.99     | 0.6 / 3.1     | 0.0      |
+| G2   | 2.40 ± 0.66      | 0.80 ± 0.75         | 1.00  | 0.88     | 2.3 / 0.1     | 0.0      |
+| G3   | **4.70 ± 1.49**  | 2.40 ± 1.28         | 1.00  | 0.98     | 4.4 / 0.3     | 0.0      |
+| G4   | 3.90 ± 0.70      | **2.70 ± 1.27**     | 1.00  | 0.92     | 3.9 / 0.0     | 0.0      |
+| G5   | 3.50 ± 1.28      | 2.60 ± 0.92         | 0.93  | 0.96     | 3.5 / 0.0     | 0.0      |
+
+**Three take-aways:**
+
+- **Peak learned performance is G3 (roles + GRU)**, not G5. Adding a role structure
+  lifts the score by **+96 %** over G2 with no extra reward engineering.
+- **Deterministic policies improve across the progression** (G2→G4: **0.80 → 2.70**),
+  i.e. constraints force the policy's argmax mode to commit to attacks rather than
+  sample them stochastically. This reverses the V1/V2 "deterministic passivity" pattern.
+- **Knight passivity emerges under tight locks.** In G4/G5 the knight lock
+  radius + forward-only role turns the knight into a near-silent partner (≈0 attacks)
+  while the archer does all of the work. Section 5.3 of the report discusses this as
+  a limitation and suggests remediations for future work.
+
+---
+
+## 4. Quick start
+
+```bash
+# 1. Setup (Python 3.10–3.12)
+python3 -m venv .venv && source .venv/bin/activate
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128   # or cpu/mps
+pip install "pettingzoo[butterfly]" gymnasium supersuit tensorboard opencv-python matplotlib numpy
+
+# 2. Smoke-test the 7 games (<10 s)
+./.venv/bin/python scripts/_smoke_v3.py
+
+# 3. End-to-end training (~3–4 h on RTX 5070 Ti)
+bash scripts/mega_train_v3.sh
+
+# 4. Evaluation pipeline (Cascade documented in docs/v3_implementation_plan.md §6)
+for g in g0 g1a g1b; do ./.venv/bin/python src/evaluate_v3.py --game $g --episodes 10 --seed 42; done
+for g in g2 g3 g4 g5; do
+  ./.venv/bin/python src/evaluate_v3.py --game $g --checkpoint models/v3/$g/final.pt --episodes 10 --seed 42
+  ./.venv/bin/python src/evaluate_v3.py --game $g --checkpoint models/v3/$g/final.pt --episodes 10 --seed 42 --deterministic
+done
+
+# 5. Demos and figures
+./.venv/bin/python src/evaluate_v3.py --game g0 --episodes 3 --seed 42 --record
+./.venv/bin/python src/evaluate_v3.py --game g5 --checkpoint models/v3/g5/final.pt --episodes 3 --seed 42 --record
+./.venv/bin/python src/phase_artifacts_v3.py
 ```
-G1–G3:  obs(flat) ──► Linear(obs,256)─ReLU─Linear(256,256)─ReLU ──► policy / value heads
-                       [MLP backbone, ~200K params]
 
-G4:     obs(27×5) ──► EntityAttentionEncoder (4-head self-attn, masked pooling)
-                    ──► Linear(256,256)─ReLU ──► policy / value heads
-                       [MLP + Attention, ~467K params]
-
-G5:     obs(27×5) ──► EntityAttentionEncoder
-                    ──► GRUCell(256,256) [h_t = f(z_t, h_{t-1})]
-                    ──► Linear(256,256)─ReLU ──► policy / value heads
-                       [Attn + GRU, 825,481 params — transfer-loaded from G4]
-```
-
-- **Algorithm:** MAPPO — all agents share one network; each observes locally
-- **Reward:** `R_i = 0.6×R_self + 0.4×R_team` from G4 onward; pure kill reward for G1–G3; death penalty (−2.0) on all games
-- **Logging:** TensorBoard reward decomposition (aggression vs. preservation) per step
-- **Device:** Auto-detected — CUDA (NVIDIA) → MPS (Apple Silicon) → CPU
+TensorBoard: `tensorboard --logdir results/tensorboard_v3`.
 
 ---
 
-## Project Structure
+## 5. Platform compatibility
+
+The codebase auto-detects CUDA → MPS → CPU at runtime. Tested on:
+
+| Platform              | Device | Notes                                   |
+|-----------------------|--------|-----------------------------------------|
+| Linux / NVIDIA GPU    | CUDA   | RTX 5070 Ti, ~480 SPS, full run ~3.5 h  |
+| macOS (Apple Silicon) | MPS    | works out of the box                    |
+| CPU-only              | CPU    | ~10–20× slower                          |
+
+---
+
+## 6. Repository layout
 
 ```
 ADLProject2/
 ├── src/
-│   ├── models/
-│   │   └── mappo_net.py     # MAPPONet: MLP / Attention / Attention+GRU
+│   ├── models/mappo_net.py           # MAPPO policy/value net (MLP / Attn / Attn+GRU, extra_dim)
 │   ├── wrappers/
-│   │   └── kaz_wrapper.py   # KAZWrapper — toggles ammo, stamina, team reward, fog
-│   ├── train.py             # MAPPO training loop (PPO + GAE, TensorBoard logging)
-│   ├── evaluate.py          # Checkpoint evaluation, metrics JSON, video recording
-│   ├── phase5.py            # Phase 5 analysis — all 4 evaluation artifacts
-│   ├── utils.py             # Device auto-detection (CUDA / MPS / CPU)
-│   └── test_env.py          # Environment smoke test
-├── models/                  # Checkpoints — game1/final.pt … game5/final.pt
+│   │   ├── kaz_wrapper.py            # V1/V2 wrapper (kept for reference)
+│   │   └── kaz_wrapper_v3.py         # V3 wrapper: 7-game config, locks, pragmatic override
+│   ├── policies/heuristic.py         # Scripted policy for G0 / G1a / G1b
+│   ├── train.py, evaluate.py, phase5.py  # V1/V2 scripts (preserved)
+│   ├── train_v3.py                   # V3 MAPPO training (attention / attention+GRU)
+│   ├── evaluate_v3.py                # V3 evaluator (all 7 games, fixed-seed-per-episode)
+│   └── phase_artifacts_v3.py         # Score evolution, metric breakdown, saliency, side-by-side demo
+├── scripts/
+│   ├── mega_train_v3.sh              # Full training orchestration
+│   ├── _preflight_v3.py              # Sanity-check KAZ internals
+│   └── _smoke_v3.py                  # 7-game wrapper smoke test
+├── models/
+│   ├── game{1..5}/                   # V1/V2 checkpoints (historical)
+│   └── v3/{g2,g3,g4,g5}/final.pt     # V3 checkpoints
 ├── results/
-│   ├── kill_density_evolution.png   # G1→G5 ablation bar chart
-│   ├── collapse_graph.png           # Stress test: spawn pressure vs. kill density
-│   ├── saliency_comparison.png      # G1 gradient saliency vs G5 attention heatmap
-│   ├── demo_sidebyside.mp4          # 30s side-by-side: Greedy Soldier vs Fire Discipline
-│   ├── final_ablation_table.md      # Full G1–G5 metrics table
-│   ├── phase4_observations.md       # G5 training analysis and findings
-│   ├── game*_eval_results*.json     # Per-game evaluation JSONs (stoch + det)
-│   └── tensorboard/                 # TensorBoard reward decomposition logs
+│   ├── tensorboard/                  # V1/V2 training curves
+│   ├── tensorboard_v3/               # V3 training curves
+│   ├── v3/
+│   │   ├── ablation_table.md         # Generated markdown ablation table
+│   │   ├── score_evolution.png       # Bar chart: G0 → G5 mean score
+│   │   ├── metric_breakdown.png      # 2×2 grid: ammo/stamina/kills/attacks
+│   │   ├── saliency_v3.png           # Attention heatmaps G3 vs G5
+│   │   ├── demo_sidebyside_v3.mp4    # G0 heuristic vs G5 learned, same seed
+│   │   ├── g*_eval_results*.json     # Per-game eval JSONs (stoch + det)
+│   │   ├── g*_demo/                  # Recorded gameplay MP4s
+│   │   └── ammo_mode.txt             # Auto-selected ammo pool mode
 ├── docs/
-│   ├── report.pdf                   # 8-page academic paper (LaTeX compiled)
-│   ├── report.tex                   # LaTeX source
-│   ├── references.bib               # Bibliography (10 citations)
-│   ├── presentation_guide.md        # 13-slide 15-min talk blueprint
-│   └── phase*_plan.md               # Per-phase implementation plans
-├── requirements.txt
-├── plan.md                  # Full project roadmap (all phases ✅)
-└── rules.md                 # Execution rules
+│   ├── report.pdf / report.tex       # V3 report (LaTeX)
+│   ├── references.bib
+│   ├── v3_implementation_plan.md     # Authoritative implementation plan for V3
+│   ├── v3_psudoplan.txt              # Group-approved design sketch (source of truth)
+│   ├── presentation_guide.md         # V3 slide-by-slide talk guide
+│   └── phase{1..4}_plan.md, v2_death_penalty_plan.md  # V1/V2 plans (historical)
+├── plan.md                           # Roadmap: V1, V2, V3 milestones
+├── rules.md                          # Execution rules
+└── requirements.txt
 ```
 
 ---
 
-## Platform Compatibility
+## 7. Documentation
 
-The codebase auto-detects the best available device at runtime — no code changes required.
-
-| Platform | Device Used | Notes |
-|----------|-------------|-------|
-| Linux / NVIDIA GPU | **CUDA** | Recommended. Trained on RTX 5070 Ti (~60 min for G5) |
-| macOS (Apple Silicon) | **MPS** | Metal Performance Shaders. All ops supported. |
-| macOS (Intel) / CPU-only | **CPU** | Fully functional, significantly slower (~10–20× vs. GPU) |
-| Windows | **WSL2 required** | Run all commands inside Ubuntu WSL2 terminal |
-
-> **Windows users:** Install WSL2 with `wsl --install` in PowerShell (Admin), then follow Linux setup steps inside the Ubuntu terminal.
+| Document                                      | Purpose                                         |
+|-----------------------------------------------|-------------------------------------------------|
+| `docs/report.pdf` / `docs/report.tex`         | Academic paper covering V3 (methods, results)   |
+| `docs/v3_implementation_plan.md`              | Reproducible spec (§4 code, §6 eval, §7 docs)   |
+| `docs/presentation_guide.md`                  | 15-min talk with slide-by-slide notes           |
+| `results/v3/ablation_table.md`                | Auto-generated markdown table (all 7 games)     |
+| `plan.md`                                     | V1 / V2 / V3 milestone ledger                   |
+| `rules.md`                                    | Execution rules (always use `./.venv/bin/python`)|
 
 ---
 
-## Setup
+## 8. Status
 
-### Prerequisites
-- Python 3.10–3.12
-- For CUDA: NVIDIA GPU with CUDA 12.x drivers
-
-```bash
-# 1. Clone
-git clone https://github.com/OneTrickBreach/ADL-Final-Project.git ADLProject2
-cd ADLProject2
-
-# 2. Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate       # Linux / macOS
-# .venv\Scripts\activate        # Windows WSL2 (same as Linux)
-```
-
-### Install PyTorch (choose your platform)
-
-```bash
-# NVIDIA GPU (CUDA 12.8)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-
-# Apple Silicon — MPS (macOS 12.3+)
-pip install torch torchvision
-
-# CPU-only
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-```
-
-### Install remaining dependencies
-
-```bash
-pip install "pettingzoo[butterfly]" gymnasium supersuit tensorboard opencv-python matplotlib
-```
-
-### Verify installation
-
-```bash
-./.venv/bin/python src/test_env.py
-# Expected output: "Smoke test PASSED"
-```
-
----
-
-## Quick Start
-
-```bash
-# Train Game 1 — baseline MLP, death penalty (~1M steps)
-./.venv/bin/python src/train.py --game_level 1 --total_timesteps 1000000 --death_penalty 2.0
-
-# Train Game 5 — Attention+GRU, full constraints, transfer from G4 (~2M steps)
-./.venv/bin/python src/train.py \
-    --game_level 5 --arch attention_gru \
-    --transfer_from models/game4/final.pt \
-    --total_timesteps 2000000 --max_cycles 900 --death_penalty 2.0
-
-# Evaluate stochastic policy (10 episodes)
-./.venv/bin/python src/evaluate.py --checkpoint models/game5/final.pt --episodes 10
-
-# Evaluate deterministic (argmax) policy
-./.venv/bin/python src/evaluate.py --checkpoint models/game5/final.pt --episodes 10 --deterministic
-
-# Record gameplay videos → results/game5_demo/
-./.venv/bin/python src/evaluate.py --checkpoint models/game5/final.pt --episodes 3 --record
-
-# Generate all Phase 5 artifacts (plots + side-by-side video)
-./.venv/bin/python src/phase5.py
-
-# Launch TensorBoard
-tensorboard --logdir results/tensorboard
-```
-
----
-
-## Full Training Sequence (G1 → G5)
-
-```bash
-# Game 1 — MLP, kill reward + death penalty
-./.venv/bin/python src/train.py --game_level 1 --total_timesteps 1000000 --death_penalty 2.0
-
-# Game 2 — MLP + ammo limit + death penalty
-./.venv/bin/python src/train.py --game_level 2 --total_timesteps 1000000 --death_penalty 2.0
-
-# Game 3 — MLP + ammo + stamina + death penalty
-./.venv/bin/python src/train.py --game_level 3 --total_timesteps 1000000 --death_penalty 2.0
-
-# Game 4 — Entity Attention + team reward + death penalty
-./.venv/bin/python src/train.py --game_level 4 --arch attention --total_timesteps 1500000 --death_penalty 2.0
-
-# Game 5 — Attention+GRU + fog + death penalty (transfer from G4)
-./.venv/bin/python src/train.py \
-    --game_level 5 --arch attention_gru \
-    --transfer_from models/game4/final.pt \
-    --total_timesteps 2000000 --max_cycles 900 --death_penalty 2.0
-```
-
----
-
-## Phase 5 Artifacts
-
-All artifacts are pre-generated in `results/`:
-
-| File | Description |
-|------|-------------|
-| `kill_density_evolution.png` | G1→G5 kill density + preservation bar chart |
-| `collapse_graph.png` | Spawn-pressure stress test — G1 vs G5 at 0.7×/1×/1.4×/2× load |
-| `saliency_comparison.png` | G1 MLP gradient saliency vs G5 attention weight heatmap (27×27) |
-| `demo_sidebyside.mp4` | 30-second side-by-side: Greedy Soldier vs Fire Discipline |
-
-To regenerate:
-```bash
-./.venv/bin/python src/phase5.py
-```
-
----
-
-## Documentation
-
-| Document | Location | Description |
-|----------|----------|-------------|
-| Academic paper | `docs/report.pdf` | 9-page LaTeX paper — methods, results, explainability |
-| LaTeX source | `docs/report.tex` + `docs/references.bib` | |
-| 15-min talk guide | `docs/presentation_guide.md` | 13 slides with speaking notes and timing |
-| Final ablation table | `results/final_ablation_table.md` | G1–G5 full metrics |
-| G5 training analysis | `results/phase4_observations.md` | Deterministic passivity diagnosis |
-
----
-
-## Progress
-
-| Phase | Status | Key Result |
-|-------|--------|------------|
-| **Phase 1** — G1 Villain Baseline | ✅ | Kill density 0.01051 (V2), mean return 3.98 ± 3.80 (death penalty active) |
-| **Phase 2** — G2/G3 Resource Scarcity | ✅ | G2: 0.00308 · G3: 0.00297 · **death penalty does NOT fix passivity** |
-| **Phase 3** — G4 Recovering Cooperator | ✅ | Density 0.00298, preservation 0.575 · attention alone still insufficient |
-| **Phase 4** — G5 Fire Discipline | ✅ | Raw kill density **0.00373** (+25% vs G4) · GRU + death penalty = best combo |
-| **Phase 5** — Evaluation & Explainability | ✅ | 4 artifacts regenerated · V2 report + presentation updated |
-| **V2** — Death Penalty Iteration | ✅ | `--death_penalty 2.0` all games · confirms GRU is necessary, penalty is complementary |
+| Milestone                                      | Status |
+|------------------------------------------------|--------|
+| V1 — 5-game ablation (G1–G5)                   | ✅ preserved on `main` for reference |
+| V2 — death-penalty iteration                   | ✅ preserved on `v2-death-penalty`   |
+| **V3 — structured teamwork (G0–G5)**           | ✅ **current `v3-overhaul` branch**  |
+| Training pipeline (6M steps total)             | ✅ complete                           |
+| Evaluation pipeline (70 episodes, stoch + det) | ✅ complete                           |
+| Phase artifacts (4 figures + demo mp4)         | ✅ complete                           |
+| Documentation (report, README, plan, slides)   | ✅ complete                           |

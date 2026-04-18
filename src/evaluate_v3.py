@@ -113,6 +113,9 @@ def evaluate(args):
 
     render_mode = "rgb_array" if args.record else None
     env = _build_env(args, ammo_mode, render_mode=render_mode, seed=args.seed)
+    # Prefer the mode the wrapper actually resolved (handles G1a/G1b whose
+    # config table fixes the mode even when the caller passes None).
+    ammo_mode = env.cfg.get("ammo_mode", ammo_mode)
 
     net, arch = (None, None)
     if not use_heuristic:

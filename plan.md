@@ -1,132 +1,155 @@
-## 🛡️ Project: The Evolution of Fire Discipline (5-Game Ablation)
+## ADL Final Project — Roadmap
 
-### Core Model Architecture
-* **Type:** Multi-Agent PPO (MAPPO) with Shared-Parameter Backbone.
-* **Modification:** Multi-Objective Reward Heads with a **60/40 Weighting** for teammate health.
-* **Hardware:** RTX 5070 Ti (optimized via `torch.cuda`).
+Live ledger for all three iterations of this study. Most recent work is V3
+("Structured Teamwork"); V1 and V2 are preserved unchanged for reference.
 
 ---
 
-### Project Directory Layout
-```
-ADLProject2/
-├── src/                        # All source code (wrappers, models, training loops)
-│   ├── wrappers/               # KAZWrapper and game-level modifier classes
-│   ├── models/                 # MAPPO network definitions and reward heads
-│   └── train.py                # Main training entry point
-├── notebooks/                  # Exploratory analysis and saliency map prototyping
-├── data/
-│   ├── raw/                    # Unprocessed environment recordings / replays
-│   └── processed/              # Preprocessed observations for offline analysis
-├── models/                     # Saved checkpoints per Game level (G1–G5)
-├── results/                    # Output plots, ablation tables, metrics, logs
-│   └── tensorboard/            # SummaryWriter logs (Reward Decomposition per run)
-├── docs/                       # Documentation and writeup assets
-├── plan.md                     # This file — check before every task
-├── rules.md                    # Execution rules for this project
-└── .venv/                      # Project-scoped virtual environment
-```
+## V3 — Structured Teamwork (current)
 
-**Artifact mapping by phase:**
-* **Phase 1–4 training scripts** → `src/train.py`, wrappers → `src/wrappers/`
-* **Checkpoints (G1–G5)** → `models/game{1..5}/`
-* **TensorBoard logs** → `results/tensorboard/`
-* **Saliency maps & video demos** → `results/` and `notebooks/`
-* **Ablation table & collapse graph** → `results/`
+> Branch: `v3-overhaul` · Reference spec: `docs/v3_implementation_plan.md`
 
----
+**Thesis.** Performance in a cooperative KAZ team comes from *structure*
+(roles, target locks, pragmatic override) rather than reward magnitude. We
+evaluate four coordination primitives in a 7-game ablation.
 
-### Phase 1: The Villain Baseline (Game 1) ✅
-* **Setup:** Default PettingZoo KAZ (Infinite ammo, no stamina costs, perfect vision).
-* **Training:** Standard $R = \text{Kills}$. Trained 502,586 steps / 409 episodes.
-* **Behavior:** The **"Greedy Soldier."** Charging zombies blindly, overlapping paths, zero coordination.
-* **Results:** Mean return 5.80 ± 2.94 | Raw kill density 0.01089 | Mean ep length 533 steps.
-* **Artifacts:** `models/game1/final.pt`, `results/game1_baseline_metrics.json`, `results/game1_demo/`.
+### Phase V3-1 — Pre-flight & smoke ✅
+* `scripts/_preflight_v3.py` — verified KAZ internals (FPS 15, obs (27,5), action
+  mapping: ext 4=attack, ext 5=noop; corrected plan constants).
+* `scripts/_smoke_v3.py` — instantiates every `game_level` ∈ `{g0,g1a,g1b,g2,g3,g4,g5}`,
+  confirms obs_dim = 140 and that 5 random steps complete without exceptions.
 
-### Phase 2: Resource Scarcity (Games 2 & 3) ✅
-* **Game 2 (+ Ammo Restriction):**
-    * **Wrapper:** Archer has 15 arrows/episode, −0.5 dry-fire penalty.
-    * **Training:** 504,134 steps / 676 episodes.
-    * **Behavior:** The **"Risk Avoider."** Archer suppresses shooting entirely (0.15% shoot rate under deterministic eval); raw kill density drops 2.5× from G1.
-    * **Results:** Mean return 0.30 ± 0.39 | Raw kills 0.85 | Raw kill density 0.00431 | Mean ep length 197 steps.
-    * **Artifacts:** `models/game2/final.pt`, `results/game2_eval_results.json`, `results/game2_demo/`.
-* **Game 3 (+ Stamina Decay):**
-    * **Wrapper:** Knight pays 0.01/move + 0.05/attack on top of G2 ammo limits.
-    * **Training:** 500,641 steps / 697 episodes.
-    * **Behavior:** The **"Fully Passive."** Knight drops attack to 0% under deterministic eval; penalty avoidance dominates the reward signal.
-    * **Results:** Mean return 0.15 ± 0.24 | Raw kills 0.50 | Raw kill density 0.00279 | Mean ep length 179 steps.
-* **Key Finding:** Penalties too strong relative to kill reward → agents learn **avoidance, not efficiency**. Phase 3 should tune penalty magnitudes before stacking 60/40 comrade reward.
-    * **Artifacts:** `models/game3/final.pt`, `results/game3_eval_results.json`, `results/game3_demo/`.
-* **Analysis:** `results/phase2_ablation_table.md`, `results/phase2_observations.md`.
+### Phase V3-2 — Implementation ✅
+Commit 1: `feat(v3): wrapper, heuristic policies, model extras, training & eval scripts` (`c75467f`).
+Commit 2: `fix(v3): pragmatic-override counter inflation + direction-aware patrol hard mask` (`b2e2369`).
 
-### Phase 3: The Altruistic Hero (Game 4) ✅
-* **Game 4 (+ 60/40 Comrade Healthcare + Entity Self-Attention):**
-    * **Logic:** Reward for Agent $i$: $R_i = (0.6 \times R_{\text{self}}) + (0.4 \times R_{\text{team}})$.
-    * **Architecture:** EntityAttentionEncoder — multi-head self-attention over (27 entities × 5 features) observation structure. 430K params (vs 200K MLP).
-    * **Training:** 507,960 steps / 706 episodes.
-    * **Behavior:** The **"Recovering Cooperator."** Kill density reverses downward trend (+29% from G3). Team reward flows (mean preservation +0.68). Archers shoot 8.6% stochastically (up from 0% in G3). But deterministic policy remains passive (0 kills) — the policy mode hasn't shifted to offensive.
-    * **Results:** Mean return 0.53 ± 0.35 | Raw kills 0.68 | Raw kill density 0.00361 | Preservation 0.68 | Mean ep length 187 steps.
-    * **Artifacts:** `models/game4/final.pt`, `results/game4_eval_results.json`, `results/game4_demo/`.
-* **Analysis:** `results/ablation_table.md`, `results/phase3_observations.md`.
+* `src/wrappers/kaz_wrapper_v3.py` — 7-game config table, ammo & stamina pools,
+  archer-immobile mode, role assignment, target-lock acquisition, G5 pragmatic
+  override, end-zone crossing detection, 5-dim observation extras.
+* `src/policies/heuristic.py` — scripted aim-and-fire / walk-and-attack for G0/G1a/G1b.
+* `src/models/mappo_net.py` — added `extra_dim` parameter; attention/attention+GRU
+  branches project extras via `nn.Linear(extra_dim, hidden_dim)` and add to pooled
+  entity vector.
+* `src/train_v3.py` — PPO loop with new TensorBoard scalars (`metric/score`,
+  `metric/failures`, `metric/ammo_pct_remaining`, `metric/stamina_pct_remaining`,
+  `metric/archer_kills`, `metric/knight_kills`, etc.), transfer-learning loader.
+* `src/evaluate_v3.py` — all 7 games, per-episode seed = `args.seed + ep_idx` so
+  zombie patterns match across games; stochastic + `--deterministic` modes.
+* `src/phase_artifacts_v3.py` — score evolution, metric breakdown, attention
+  saliency heatmaps (G3 vs G5), side-by-side demo stitcher, ablation table.
+* `scripts/mega_train_v3.sh` — orchestration script (heuristic evals → ammo-mode
+  selection → train G2 → transfer G3 → transfer G4 → transfer G5).
 
-### Phase 4: Tactical Uncertainty (Game 5 - The Final Hero) ✅
-* **Game 5 (+ Gaussian Fog + GRU Recurrence):**
-    * **Wrapper:** Gaussian noise (σ=0.3) applied to all observations per step.
-    * **Architecture:** EntityAttentionEncoder + GRUCell(256, 256) temporal memory. 825,481 params. Transfer loaded 26/26 tensors from G4.
-    * **Training:** 1,506,717 steps / 2,076 episodes on RTX 5070 Ti (~60 min).
-    * **Behavior:** The **"Fire Discipline."** GRU memory integrates noisy observations over time, allowing the policy mode to commit to attacks. Deterministic attack rate: **69.9%** (vs ~0% in G4). Both aggression (+0.0030 peak) and preservation (+0.0040 peak) positive simultaneously.
-    * **Key Result:** Deterministic passivity fully resolved. Shaped kill density +0.00165 (+27% vs G4 +0.00130) despite fog handicap.
-    * **Results:** Mean return +0.38 ± 0.31 (stoch) | +0.20 ± 0.19 (det) | Raw kill density 0.00299 | Kill density 0.00165 | Preservation +0.525 | Mean ep length 176 steps.
-    * **Artifacts:** `models/game5/final.pt`, `results/game5_eval_results.json`, `results/game5_eval_results_det.json`, `results/game5_demo/`, `results/final_ablation_table.md`, `results/phase4_observations.md`.
+### Phase V3-3 — Training ✅
 
----
+~3.5 h on RTX 5070 Ti (~480 SPS). Ammo-mode auto-selected = **global** (G1a ≥ G1b tied;
+deterministic tiebreak).
 
-### Phase 5: Evaluation & Explainability ✅
-1.  **Quantitative:**
-    * **Ablation Table:** ✅ `results/final_ablation_table.md` — G1–G5 kill density, preservation, action distribution, constraint stack.
-    * **The "Collapse" Graph:** ✅ `results/collapse_graph.png` — G1 vs G5 at 4 spawn-pressure levels (0.7x→2.0x). G5 degrades more gracefully.
-    * **Kill Density Evolution:** ✅ `results/kill_density_evolution.png` — Bar chart of behavioral trajectory + team reward signal.
-2.  **Qualitative (The "Explain" Box):**
-    * **Saliency Maps:** ✅ `results/saliency_comparison.png` — G1 gradient saliency (narrow, enemy-focused) vs G5 attention weights (distributed, includes teammate slots) + full attention heatmap.
-    * **Video Demo:** ✅ `results/demo_sidebyside.mp4` — 900-frame side-by-side: G1 "Greedy Soldier" vs G5 "Fire Discipline" (30s @ 30fps).
-    * **Script:** `src/phase5.py`
+| Stage | Steps     | Params  | Arch            | Transferred    |
+|-------|-----------|---------|-----------------|----------------|
+| G2    | 1,000,000 | 432,265 | Attention       | scratch        |
+| G3    | 1,500,000 | 827,017 | Attention + GRU | 28 / 32 from G2 (4 GRU tensors new) |
+| G4    | 1,500,000 | 827,017 | Attention + GRU | 32 / 32 from G3 |
+| G5    | 2,000,000 | 827,017 | Attention + GRU | 32 / 32 from G4 |
+
+### Phase V3-4 — Evaluation ✅
+
+10 episodes per game (+ 10 deterministic for G2–G5) + 3-episode video recordings for
+G0 and G5. Seed convention: `42 + ep_idx` so every game's episode-n uses the same
+zombie spawn pattern.
+
+| Game | Stochastic      | Deterministic | Kills A/K | Failures |
+|------|-----------------|---------------|-----------|----------|
+| G0   | **10.10 ± 4.11**| —             | 4.5 / 5.6 | 0.0      |
+| G1a  | 3.70 ± 1.19     | —             | 0.6 / 3.1 | 0.0      |
+| G1b  | 3.70 ± 1.19     | —             | 0.6 / 3.1 | 0.0      |
+| G2   | 2.40 ± 0.66     | 0.80 ± 0.75   | 2.3 / 0.1 | 0.0      |
+| G3   | **4.70 ± 1.49** | 2.40 ± 1.28   | 4.4 / 0.3 | 0.0      |
+| G4   | 3.90 ± 0.70     | **2.70 ± 1.27** | 3.9 / 0.0 | 0.0    |
+| G5   | 3.50 ± 1.28     | 2.60 ± 0.92   | 3.5 / 0.0 | 0.0      |
+
+**Three findings:**
+1. Roles (G3) are the single biggest structural win: **+96 %** over G2 with no
+   extra reward engineering.
+2. Deterministic scores increase G2→G4 (0.80 → 2.70), reversing the V1/V2
+   deterministic-passivity pattern — structure hardens the argmax mode.
+3. Tight knight locks (G4/G5) produce **knight passivity**: archers do all the
+   kills while knights attack ~0 times/ep. Section 5.3 of the report discusses
+   remediation (wider lock radius / lower knight stamina cost / learned role bonus).
+
+### Phase V3-5 — Documentation ✅
+* `README.md` rewrite (V3 narrative).
+* `docs/report.tex` + `docs/report.pdf` — full academic write-up of V3.
+* `docs/presentation_guide.md` — 15-min slide-by-slide deck.
+* `results/v3/ablation_table.md` — auto-generated markdown table.
+* V1/V2 plan sections below preserved unchanged.
 
 ---
 
-### V2: Death Penalty Design Iteration ✅
+## V2 — Death Penalty Iteration (superseded by V3)
 
-> **Motivation:** Elizabeth identified that G2/G3 agents learn passivity because there are penalties for acting (ammo waste, stamina cost) but zero cost for dying. Hypothesis: adding a death penalty (−2.0 per death) would make "die passively" clearly worse than "kill and survive."
+> Branch: `v2-death-penalty` · Historical; see `docs/v2_death_penalty_plan.md`.
 
-**Code changes (branch: `v2-death-penalty`):**
-* `kaz_wrapper.py`: `death_penalty` parameter, applied on agent termination, added to `reward_info`
-* `train.py`: `--death_penalty` CLI arg (default 2.0), TensorBoard logging of `reward/death_penalty`
-* `evaluate.py`: reads death_penalty from checkpoint, passes to wrapper, tracks in results JSON
-* `phase5.py`: passes death_penalty to all KAZWrapper constructors for consistency
+* `KAZWrapper` gained a `death_penalty` parameter (default 2.0) applied on agent
+  termination, threaded through training, evaluation, and `phase5.py`.
+* All 5 games retrained with `--death_penalty 2.0`.
+* Key finding: death penalty alone does **not** fix the MLP passivity collapse
+  (G2/G3 deterministic kills remain 0/ep). Only G5 (attention + GRU) converts the
+  survival signal into active behaviour (raw kill density 0.00373, +25 % vs V1).
 
-**Training (V2):** All 5 games retrained with `--death_penalty 2.0`:
-* G1–G3: 1M steps each (MLP)
-* G4: 1.5M steps (Attention)
-* G5: 2M steps (Attention+GRU, transfer from G4)
+| Game | V1 Raw Kill Density | V2 Raw Kill Density | Δ       |
+|------|---------------------|---------------------|---------|
+| G1   | 0.01089             | 0.01051             | −3.5 %  |
+| G2   | 0.00431             | 0.00308             | −29 %   |
+| G3   | 0.00279             | 0.00297             | +6.5 %  |
+| G4   | 0.00361             | 0.00298             | −17 %   |
+| G5   | 0.00299             | **0.00373**         | **+25 %** |
 
-**Key findings:**
-1. **Death penalty alone does NOT fix deterministic passivity in MLP models (G2–G3).** G3 deterministic raw kills: 0.00/episode — unchanged from V1.
-2. **Death penalty + GRU is complementary.** G5 V2 raw kill density: 0.00373 (+25% vs V1's 0.00299) — the highest of any constrained game.
-3. **Architectural capacity is the bottleneck, not reward magnitude.** MLP agents lack the representational capacity to convert "don't die" into "fight back."
-
-| Game | V1 Raw Kill Density | V2 Raw Kill Density | Δ |
-|------|--------------------|--------------------|---|
-| G1 | 0.01089 | 0.01051 | −3.5% |
-| G2 | 0.00431 | 0.00308 | −29% |
-| G3 | 0.00279 | 0.00297 | +6.5% |
-| G4 | 0.00361 | 0.00298 | −17% |
-| G5 | 0.00299 | **0.00373** | **+25%** |
+Artifacts preserved in `models/game{1..5}/`, `results/game*_eval_results*.json`,
+`results/final_ablation_table.md`, `results/phase4_observations.md`.
 
 ---
 
-### 🚀 Immediate Next Steps:
-1.  ~~**Code the Wrappers:** Create a single `KAZWrapper` class that can toggle Ammo, Stamina, and Fog based on a `game_level` argument.~~ ✅ Done
-2.  ~~**Reward Scalarizer:** Implement the $0.6/0.4$ logic in your environment's `step()` function so it's baked into the reward signal before it hits the PPO agent.~~ ✅ Done
-3.  ~~**Phase 2:** Train Game 2 (ammo restriction) and Game 3 (stamina decay) — wrappers are already wired in `KAZWrapper`.~~ ✅ Done
-4.  ~~**Phase 3:** Train Game 4 (60/40 comrade healthcare + entity self-attention).~~ ✅ Done
-5.  ~~**Phase 4:** Train Game 5 (Gaussian fog + GRU recurrence) — the Final Hero.~~ ✅ Done
-6.  ~~**V2:** Death penalty iteration — retrain all games, re-evaluate, update docs.~~ ✅ Done
+## V1 — 5-Game Ablation "Evolution of Fire Discipline" (superseded by V3)
+
+> Branch: `main` · Historical.
+
+### Phase 1 — G1 Villain Baseline ✅
+Default KAZ with kill reward. "Greedy Soldier": charging zombies blindly,
+overlapping paths, zero coordination. 502 k steps / 409 episodes. Mean return
+5.80 ± 2.94; raw kill density 0.01089.
+
+### Phase 2 — G2/G3 Resource Scarcity ✅
+* G2 (+15 arrow/ep ammo, −0.5 dry-fire penalty): 504 k steps / 676 ep. The "Risk
+  Avoider." Archer drops to 0.15 % shoot rate under deterministic eval.
+* G3 (+0.01 move / +0.05 attack stamina): 500 k steps / 697 ep. "Fully Passive."
+  Knight drops attack rate to 0 %.
+Key finding: penalties too strong relative to kill reward → agents learn avoidance
+rather than efficiency.
+
+### Phase 3 — G4 Altruistic Hero ✅
+* 60/40 team reward + entity self-attention encoder. 508 k steps / 706 ep.
+  430 k params. "Recovering Cooperator": kill density reverses downward trend
+  (+29 % vs G3); team reward flows (preservation +0.68). Deterministic still
+  passive (0 kills/ep).
+
+### Phase 4 — G5 Fire Discipline ✅
+* Gaussian fog (σ=0.3) + Attention + GRU (825 481 params). 1.5 M steps, transfer-
+  loaded 26 / 26 tensors from G4. Deterministic attack rate: **69.9 %** (vs 0 % in
+  G4). Both aggression and preservation positive simultaneously.
+* Diagnosed *deterministic passivity* as a previously under-described MARL failure
+  mode; GRU temporal memory resolves it.
+
+### Phase 5 — Evaluation & Explainability ✅
+Ablation table, collapse graph (G1 vs G5 at 0.7×/1×/1.4×/2× spawn pressure),
+saliency comparison (MLP gradient vs attention heatmap), 30 s side-by-side demo
+video. Script: `src/phase5.py`.
+
+---
+
+## Artifacts preserved as reference
+
+`phase{1..4}_plan.md`, `v2_death_penalty_plan.md`, `models/game{1..5}/`,
+`results/game*_eval_results*.json`, `results/final_ablation_table.md`,
+`results/kill_density_evolution.png`, `results/collapse_graph.png`,
+`results/saliency_comparison.png`, `results/demo_sidebyside.mp4`.

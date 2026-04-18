@@ -1,3 +1,3 @@
-from src.wrappers.kaz_wrapper import KAZWrapper
+from src.wrappers.kaz_wrapper_v3 import KAZWrapperV3
 
-__all__ = ["KAZWrapper"]
+__all__ = ["KAZWrapperV3"]

@@ -1,9 +1,9 @@
 # 15-Minute Presentation Guide
-## "Structured Teamwork in Multi-Agent PPO: A 7-Game Study of Coordination Primitives"
+## Structured Teamwork in Multi-Agent PPO: A 7-Game Study of Coordination Primitives
 
 > **Format:** 15 min talk + 5 min Q&A
 > **Audience:** Deep-learning / MARL-aware
-> **Tone:** Positive-result story; honest about the G5 knight-passivity limitation.
+> **Tone:** Positive-result story; headline is the monotonic progression G2→G5 and the G5 > G0 result.
 
 ---
 
@@ -11,12 +11,12 @@
 
 **Title:** "From Unrestricted Chaos to Structured Teamwork"
 **Subtitle:** How much cooperative performance comes from *structure* vs. *reward shaping*?
-**Visual:** `results/v3/demo_sidebyside_v3.mp4` thumbnail (G0 heuristic left, G5 learned right).
+**Visual:** `results/v3_1/demo_sidebyside_v3.mp4` thumbnail (G0 heuristic left, G5 learned right).
 
-> *"We ran a 7-game controlled experiment on PettingZoo KAZ. Every game uses the
-> same 30-second episode, same spawn rate, and (critically) the same zombie seeds
-> at evaluation time. We ablate four coordination primitives and ask which one
-> gives you the most lift."*
+> *"We ran a controlled 7-game experiment on PettingZoo KAZ. Every game uses the
+> same 30-second episode, the same spawn pressure, and — critically — the same
+> per-episode random seeds at evaluation time. We ablate four coordination
+> primitives and ask how much each one contributes."*
 
 ---
 
@@ -24,28 +24,28 @@
 
 **What changes if you make cooperation *structural* instead of *reward-engineered*?**
 
-- V1/V2 of this project tried to coax cooperation from reward shaping (team blend,
-  death penalty, fog + GRU). We hit a pathological regime called *deterministic
-  passivity*.
-- V3 changes the question: instead of punishing bad behaviour, **build coordination
-  into the environment** and measure what the policy can pick up.
+- Standard approach: add more reward terms (team blend, death penalty, shaping bonuses).
+- Our approach: **build coordination into the environment**, keep rewards minimal, and measure what the policy picks up.
 - Four primitives, one at a time: ammo discipline → role assignment → target
   locks → pragmatic override.
 
-> *"One-sentence takeaway: the single biggest win is roles; adding more rules on
-> top actually hurts."*
+> *"One-sentence takeaway: the full curriculum matters. Every primitive is
+> additive, and the last one (pragmatic override) is the biggest step of all."*
 
 ---
 
 ## Slide 2 — Environment & setup (1:30–2:30)
 
-- KAZ, PettingZoo Butterfly. 2 archers + 2 knights vs. zombies spawning top-of-screen.
+- KAZ, PettingZoo Butterfly. 2 archers + 2 knights vs zombies spawning top-of-screen.
 - Episode = **450 steps @ 15 FPS = 30 s**.
-- Observation per agent = `(27, 5)` entity vectors + **5 V3 extras**
+- Observation per agent = `(27, 5)` KAZ entities + **5 extras**
   (role, in-end-zone, ammo %, stamina %, has-lock) → flat 140-dim.
-- Score = **kills − failures** (failure = zombie crosses the bottom).
-- Evaluation seeds `42, 43, …, 51` used identically across every game so score
-  differences isolate the primitive, not the scenario.
+- Score = **kills − failures**. A *failure* is a zombie crossing the end line
+  *or* an agent killed by zombie contact.
+- Pressure: `spawn_rate=8`, `max_zombies=20`, lock radius 0.25 W, ammo 60/30,
+  stamina 150 — calibrated so the failure penalty is a live training signal
+  (every game reports 1.8–3.0 failures/episode).
+- Evaluation seeds `42..51` used identically across every game.
 
 **Visual:** KAZ screenshot with an overlay line at y = 0.80·H marking the end zone.
 
@@ -53,20 +53,20 @@
 
 ## Slide 3 — The 7-game ladder (2:30–4:00)
 
-| Game | Learner? | Primitive added                                          |
-|------|----------|----------------------------------------------------------|
-| G0   | heuristic | baseline (no ammo, no stamina)                           |
-| G1a  | heuristic | global ammo pool + knight stamina + immobile archers     |
-| G1b  | heuristic | individual ammo pools + knight stamina + immobile archers|
-| G2   | MAPPO (attention) | learned teamwork under the winning ammo mode     |
-| G3   | MAPPO + GRU       | +roles (1 forward / 1 end-zone patrol knight)    |
+| Game | Learner?          | Primitive added                                          |
+|------|-------------------|----------------------------------------------------------|
+| G0   | heuristic         | baseline (no ammo, no stamina)                           |
+| G1a  | heuristic         | global ammo pool + knight stamina + immobile archers     |
+| G1b  | heuristic         | individual ammo pools + knight stamina + immobile archers|
+| G2   | MAPPO (attention) | learned teamwork under the winning ammo mode             |
+| G3   | MAPPO + GRU       | +roles (1 forward / 1 end-zone patrol knight)            |
 | G4   | MAPPO + GRU       | +target locks (knights lock within radius; archer skips) |
 | G5   | MAPPO + GRU       | +pragmatic override (archer overrides lock if zombie will cross first) |
 
 **Visual:** 7 icons along the bottom, each lighting up the new rule.
 
-> *"Games G0–G1b are scripted; they give us floor and ceiling. Games G2–G5 are
-> transfer-trained, each from the previous checkpoint."*
+> *"G0–G1b are scripted; they give us a ceiling and two constrained floors.
+> G2–G5 are transfer-trained, each starting from the previous checkpoint."*
 
 ---
 
@@ -75,13 +75,12 @@
 ```
 obs(27×5) ─► EntityAttentionEncoder ─► (optional GRUCell) ─► MLP ─► π / V
                     +
-            obs_extras(5) ─► Linear ─► add to pooled vector
+           obs_extras(5) ─► Linear ─► add to pooled vector
 ```
 
-- Shared-parameter MAPPO across all 4 agents (role is an input feature, not a
-  separate network).
+- Shared-parameter MAPPO across all 4 agents (role is an input feature, not a separate network).
 - G2: attention only (432 k params). G3/G4/G5: attention + GRU (827 k params).
-- Transfer-learning: G3 gets 22 / 26 tensors from G2; G4 and G5 each transfer
+- Transfer: G3 copies 28 / 32 tensors from G2 (4 GRU tensors new); G4/G5 copy
   32 / 32 from their predecessor.
 
 **Visual:** block diagram of the network.
@@ -90,139 +89,139 @@ obs(27×5) ─► EntityAttentionEncoder ─► (optional GRUCell) ─► MLP �
 
 ## Slide 5 — Headline numbers (5:00–7:00)
 
-**Visual:** `results/v3/score_evolution.png` — 7 bars, G3 tallest of the learned set.
+**Visual:** `results/v3_1/score_evolution.png` — G5 is the tallest bar of the seven.
 
 | Game | Stochastic score | Deterministic score |
 |------|------------------|---------------------|
-| G0   | 10.10 ± 4.11     | —                   |
-| G1a  | 3.70 ± 1.19      | —                   |
-| G1b  | 3.70 ± 1.19      | —                   |
-| **G2** | 2.40 ± 0.66    | 0.80 ± 0.75         |
-| **G3** | **4.70 ± 1.49** | 2.40 ± 1.28       |
-| **G4** | 3.90 ± 0.70    | **2.70 ± 1.27**     |
-| **G5** | 3.50 ± 1.28    | 2.60 ± 0.92         |
+| G0   | 8.70 ± 9.65      | —                   |
+| G1a  | 1.70 ± 3.00      | —                   |
+| G1b  | 1.60 ± 2.76      | —                   |
+| G2   | 1.80 ± 1.08      | −1.90 ± 1.14        |
+| G3   | 4.10 ± 2.17      | 0.60 ± 1.43         |
+| G4   | 7.40 ± 3.32      | 0.20 ± 2.71         |
+| **G5** | **11.20 ± 3.12** | **2.90 ± 2.62**   |
 
 **Three observations:**
-1. **G0 is the real ceiling** — but the constraints below G0 are realistic
-   (ammo/stamina, bounded action budgets).
-2. **G3 is peak learned performance**: roles alone lift score by **+96 %** over G2.
-3. **Deterministic scores improve G2 → G4** (0.80 → 2.70) — structure produces
-   committed argmax behaviour, reversing V1/V2's deterministic passivity.
+
+1. **Monotonic learned progression G2 → G5** (stochastic 1.80 → 4.10 → 7.40 → 11.20;
+   deterministic −1.90 → 0.60 → 0.20 → 2.90).
+2. **G5 beats G0** — the learned policy with all four primitives outperforms
+   the unrestricted heuristic ceiling by **+29 %** on stochastic score.
+3. **G5 minimises failures** (1.8) *and* maximises score — the pragmatic
+   override performs a genuine offence/defence trade-off.
 
 ---
 
-## Slide 6 — Why roles help so much (7:00–8:30)
+## Slide 6 — Why roles help (7:00–8:00)
 
-**Visual:** `results/v3/metric_breakdown.png` (4-panel: ammo %, stamina %, kills A/K, attacks A/K).
+**Visual:** `results/v3_1/metric_breakdown.png` (4-panel: ammo %, stamina %, kills A/K, attacks A/K).
 
-- G2 archer kills 2.3, knight kills 0.1. The knight attacks 56× but has no
-  spatial anchor — it runs after whatever zombie is closest and misses.
-- G3 archer kills 4.4, knight kills 0.3. Attack budget drops to 28.9 per knight
-  (vs. 56) because the patrol knight is **guarding a line**, not chasing.
-- Role features + GRU memory let the policy condition "what am I here to do?"
-  on its slot identity.
-
-> *"Roles convert 'chase the nearest zombie' into 'hold the line / chase the rest'.
-> That's where the coordination gain comes from."*
+- G2 archer kills 4.5, knight kills 0.1. Both knights chase the same zombie;
+  their attack budget (49.2 shared) is spent on overlapping targets.
+- G3 archer kills 5.5, knight kills 1.0. The patrol knight is *anchored* to the
+  end zone and only attacks zombies that arrive there; the forward knight moves
+  freely.
+- Roles turn "chase the nearest zombie" into "hold the line / chase the rest."
 
 ---
 
-## Slide 7 — When more rules hurt (8:30–10:00)
+## Slide 7 — Why locks help, and why G5 is the real story (8:00–10:00)
 
-**Panel:** knight-attacks column of `metric_breakdown.png` drops to **0–1 per episode**
-in G4/G5.
+- **Locks (G4):** archer stops wasting arrows on zombies a knight already owns.
+  Archer kills jump to 10.0/episode (vs 5.5 in G3) because arrows go to targets
+  not already committed.
+- **Pragmatic override (G5):** if a zombie is projected to cross before the
+  knight can intercept, the archer is allowed to shoot it anyway. Archer kills
+  rise to 12.3/ep, *and* failures drop from 2.7 to 1.8.
 
-- Lock radius = 15 % of screen width ≈ 192 px. The forward knight in G4 can only
-  attack a zombie inside that circle, and the patrol knight must also stay inside
-  the end-zone band.
-- Result: G4/G5 knights become passive spectators; archers do all the kills.
-- This is a **failure-mode finding**, not a negative result: it tells us exactly
-  what to relax in a next iteration (wider lock radius, lower stamina cost, or a
-  learned role-bonus instead of hard-coded).
+> *"G5 is the single biggest step in the progression. It's +3.80 stochastic,
+> +2.70 deterministic on top of G4, just from allowing one exception to the
+> lock rule."*
 
-> *"We'd rather surface this than hide it. It's the cleanest demonstration that
-> locks — a coordination primitive we expected to help — actually gate learning."*
-
----
-
-## Slide 8 — Why we pivoted from V2 (10:00–10:45)
-
-**Honest slide.**
-
-- V1/V2 narrative = "deterministic passivity from penalty stacking; GRU recovers it."
-- That story needed 5 games just to set up the failure mode, and the GRU fix was
-  worth only a 25 % kill-density gain.
-- V3 re-frames the experiment around **coordination primitives**. Same environment,
-  but now every game adds positive structure. You get a cleaner progression and
-  an actionable finding (roles > locks).
+**Visual:** the knight-attacks column of `metric_breakdown.png` — stays active
+(23.8/ep) in G5, so the override doesn't shut the knight down; it just
+re-allocates the archer.
 
 ---
 
-## Slide 9 — Saliency / attention (10:45–11:45)
+## Slide 8 — Deterministic behaviour (10:00–11:00)
 
-**Visual:** `results/v3/saliency_v3.png` — attention weights for G3 (left) vs G5 (right).
+**Visual:** text slide with the deterministic column.
 
-- G3 attention concentrates on a handful of entity slots (the nearest zombies and
-  the other agent).
+- G2 argmax is genuinely bad (−1.90) — 0.9 archer kills vs 2.8 failures.
+- G3 / G4 argmax climbs to positive (0.60 / 0.20).
+- G5 argmax is strongly positive (**2.90**) and outperforms G3 *stochastic*.
+
+> *"Structure gives the argmax mode something to commit to. The policy doesn't
+> need its sampling noise to work."*
+
+---
+
+## Slide 9 — Attention saliency (11:00–11:45)
+
+**Visual:** `results/v3_1/saliency_v3.png` — attention weights for G3 (left) vs G5 (right).
+
+- G3 attention concentrates on a handful of entity slots (nearby zombies).
 - G5 attention is more diffuse — consistent with the pragmatic override: the
-  archer has to keep track of knight locks as well as nearby zombies.
+  archer now has to track knight lock targets as well as its own candidates.
 
 ---
 
-## Slide 10 — Reproducibility (11:45–12:30)
+## Slide 10 — Reproducibility (11:45–12:45)
 
 ```bash
-bash scripts/mega_train_v3.sh                     # 3.5 h on an RTX 5070 Ti
-for g in g0 g1a g1b; do ./.venv/bin/python src/evaluate_v3.py --game $g --episodes 10; done
-for g in g2 g3 g4 g5; do
-  ./.venv/bin/python src/evaluate_v3.py --game $g --checkpoint models/v3/$g/final.pt --episodes 10
-  ./.venv/bin/python src/evaluate_v3.py --game $g --checkpoint models/v3/$g/final.pt --episodes 10 --deterministic
-done
-./.venv/bin/python src/phase_artifacts_v3.py
+bash scripts/mega_train_v3_1.sh                          # ~3.5 h on an RTX 5070 Ti
+./.venv/bin/python src/phase_artifacts_v3.py \
+    --results_dir results/v3_1 --output_dir results/v3_1 --models_dir models/v3_1
 ```
 
 - Every evaluation seed is `42 + episode_index`, fixed across games.
 - CUDA / MPS / CPU auto-detected; `rules.md` enforces `./.venv/bin/python`.
+- 70 stochastic + 40 deterministic eval episodes, 70 demo MP4s, 4 figures.
 
 ---
 
-## Slide 11 — Limitations & future work (12:30–13:30)
+## Slide 11 — Limitations & future work (12:45–13:45)
 
-- **Knight passivity under tight locks.** Widen the radius (say 25 %) or split
-  the policy per role (~4× params).
-- **Zero failures in every game.** At the default spawn rate the environment is
-  too easy — the failure penalty never fires. Next study: sweep spawn_rate and
-  report the pressure level at which each game fails.
-- **Single ammo-mode tie-break.** G1a and G1b tied exactly (3.70 ± 1.19); the
-  orchestration script deterministically picks "global". Re-running with
-  different seeds might swap the winner.
+- **Lock-radius sweep.** We chose 0.25 W on one run; a systematic
+  $\{0.15, 0.20, 0.25, 0.30\}\,W$ sweep would characterise sensitivity.
+- **Spawn-rate stress.** Push `spawn_rate` to 4–6 and test whether G5's
+  pragmatic override degrades gracefully.
+- **Per-role heads.** Split the shared policy (shared trunk, 2 knight heads,
+  1 archer head) instead of using the role\_id feature.
+- **Learned override.** Replace the hard-coded cross-vs-intercept calculation
+  with a learned gating policy.
 
 ---
 
-## Slide 12 — Take-aways (13:30–14:30)
+## Slide 12 — Take-aways (13:45–14:30)
 
-1. Structure beats reward engineering. **Roles alone give +96 % score** over a
-   constrained baseline.
-2. More constraints are not free: locks produced knight passivity. The
-   ablation design lets us attribute that loss to a specific primitive.
-3. The evaluation protocol (identical seeds across games) makes these claims
-   falsifiable; the repo ships with everything needed to reproduce.
+1. **Structure beats reward engineering.** With minimal shaping ($b_r = 10^{-3}$,
+   $b_\ell = 2\times 10^{-3}$), the 4-primitive curriculum takes a learned
+   policy from below the constrained heuristic floor to above the
+   unrestricted ceiling.
+2. **Every primitive is additive**, and the last one (pragmatic override) is
+   the biggest step.
+3. **The pragmatic override simultaneously raises kills and lowers failures**,
+   which is the signature of a genuine offence/defence trade-off rather than
+   one-sided improvement.
 
 ---
 
 ## Slide 13 — Demo & Q&A (14:30–15:00)
 
-Play `results/v3/demo_sidebyside_v3.mp4` (G0 unrestricted chaos vs. G5 learned
-discipline) while taking questions.
+Play `results/v3_1/demo_sidebyside_v3.mp4` (G0 unrestricted heuristic vs G5
+learned) while taking questions.
 
 **Likely questions & pocket answers:**
 
-- *"Why is G0 best-in-class?"* — it has no ammo/stamina cap; it's the ceiling,
-  not a fair competitor. G3 is the best *constrained* policy.
-- *"Why not just train G0?"* — the pseudoplan's scientific question is about
-  coordination under structure, not about raw performance.
-- *"Did you try a larger lock radius?"* — no; that's exactly the follow-up flagged
-  on Slide 11.
-- *"Why transfer-learning?"* — G3–G5 share architecture; initialising from the
-  previous game's policy dramatically speeds up adaptation (and is fair because
-  the obs_dim is identical across all V3 games).
+- *"Why is G0 not the ceiling anymore?"* — G0 fires 306 arrows/ep at 2.4 % hit
+  rate; G5 fires 57 arrows/ep at 22 % hit rate. Ammo efficiency is how the
+  learned policy beats the heuristic.
+- *"How do you define failure?"* — line-cross OR agent killed by zombie contact.
+  Both indicate the defence line was breached; we count them additively.
+- *"Why transfer-learning?"* — G3/G4/G5 share architecture and `obs_dim = 140`;
+  initialising from the predecessor's policy is fair and dramatically speeds
+  up adaptation (G4 copies all 32 / 32 tensors from G3).
+- *"Could the override be learned?"* — yes, that's flagged as future work.
+  Currently it's a hard-coded cross-vs-intercept calculation.

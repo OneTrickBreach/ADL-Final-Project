@@ -103,8 +103,10 @@ obs(27×5) ─► EntityAttentionEncoder ─► (optional GRUCell) ─► MLP �
 
 **Three observations:**
 
-1. **Monotonic learned progression G2 → G5** (stochastic 1.80 → 4.10 → 7.40 → 11.20;
-   deterministic −1.90 → 0.60 → 0.20 → 2.90).
+1. **Strictly monotonic stochastic progression G2 → G5** (1.80 → 4.10 → 7.40 → 11.20).
+   Deterministic climbs from strongly negative to strongly positive
+   (−1.90 → 0.60 → 0.20 → 2.90); G3 and G4 are tied within noise
+   (±1.4–±2.7σ), and **G5 is the peak on both metrics**.
 2. **G5 beats G0** — the learned policy with all four primitives outperforms
    the unrestricted heuristic ceiling by **+29 %** on stochastic score.
 3. **G5 minimises failures** (1.8) *and* maximises score — the pragmatic
@@ -149,11 +151,13 @@ re-allocates the archer.
 **Visual:** text slide with the deterministic column.
 
 - G2 argmax is genuinely bad (−1.90) — 0.9 archer kills vs 2.8 failures.
-- G3 / G4 argmax climbs to positive (0.60 / 0.20).
-- G5 argmax is strongly positive (**2.90**) and outperforms G3 *stochastic*.
+- G3 / G4 argmax are near zero (0.60 / 0.20, tied within noise).
+- G5 argmax is strongly positive (**2.90**) — an absolute swing of **+4.80**
+  from G2 along the progression.
 
-> *"Structure gives the argmax mode something to commit to. The policy doesn't
-> need its sampling noise to work."*
+> *"Structure gives the argmax mode something to commit to. The policy still
+> leans on sampling noise for its peak score, but the argmax mode is now
+> substantively productive instead of frozen."*
 
 ---
 

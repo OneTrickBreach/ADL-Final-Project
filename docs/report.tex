@@ -60,8 +60,9 @@ entity self-attention (\gii{}) or attention + GRU (\giii--\gv{}) with
 transfer-learning between adjacent games. All games share identical
 episode length, spawn pressure, and per-episode evaluation seeds so that
 score differences isolate the primitive. Our main finding is that the
-learned progression \gii{} $\to$ \gv{} is monotonic in both stochastic
-and deterministic regimes, and the peak learned policy (\gv{}) beats the
+learned stochastic progression \gii{} $\to$ \gv{} is strictly monotonic,
+the deterministic progression is non-decreasing within noise and peaks
+on the same game, and the peak learned policy (\gv{}) beats the
 unrestricted heuristic ceiling (\gz{}) by \textbf{$+29\%$}. The pragmatic
 override (\gv{}) simultaneously maximises score and minimises failures,
 evidence that it performs a genuine offence / defence trade-off.
@@ -88,10 +89,12 @@ contribution of each primitive.
   \item A seed-paired evaluation protocol in which episode~\emph{i} uses
     the same random seed across every game, so zombie spawn patterns are
     identical and score deltas are directly attributable to primitives.
-  \item Quantitative evidence that the learned progression is monotonic
-    on both stochastic and deterministic evaluation: stochastic
-    $1.80 \to 4.10 \to 7.40 \to 11.20$; deterministic
-    $-1.90 \to 0.60 \to 0.20 \to 2.90$.
+  \item Quantitative evidence that stochastic scores are strictly
+    monotonic across the progression
+    ($1.80 \to 4.10 \to 7.40 \to 11.20$) and that deterministic scores
+    climb from strongly negative to strongly positive along the same
+    sequence ($-1.90 \to 0.60 \to 0.20 \to 2.90$), peaking on the same
+    game as stochastic evaluation.
   \item Identification of the pragmatic override as the single largest
     step in the progression (\giv{} $\to$ \gv{}: $+3.80$ stochastic,
     $+2.70$ deterministic), and the only primitive that
@@ -374,14 +377,18 @@ a strictly worse policy on every metric we track.
 
 \subsection{Deterministic results reinforce the structure story}
 
-Under argmax, score also climbs monotonically
-$-1.90 \to 0.60 \to 0.20 \to 2.90$, and \gv{}'s deterministic score
-($2.90$) outperforms \giii{}'s stochastic score ($4.10$) by a factor
-that matters: the policy does not need its sampling noise to work.
-This is the opposite of the failure pattern where constrained policies
-fire stochastically but freeze under argmax. The transition
-\giv{} $\to$ \gv{} (stochastic $+3.80$, deterministic $+2.70$) is
-particularly important: it shows the override turns a policy that was
+Under argmax, score climbs from strongly negative at \gii{}
+($-1.90$) to strongly positive at \gv{} ($2.90$)---an absolute swing of
+$+4.80$ along the progression. The intermediate step is noisier:
+\giii{} deterministic ($0.60 \pm 1.43$) and \giv{} deterministic
+($0.20 \pm 2.71$) differ by less than one standard error, so the pair
+should be read as ``both approximately zero'' rather than as a
+regression. The important signal is that by \gv{} the argmax mode is
+substantively productive ($+2.90$, $\sigma = 2.62$), unlike the
+constrained-but-stochastic failure pattern where argmax policies freeze
+while sampling still fires. The transition \giv{} $\to$ \gv{}
+(stochastic $+3.80$, deterministic $+2.70$) is the single largest step
+on both metrics: the override turns a policy that was
 committed-but-rigid (\giv{}, 0.2 deterministic) into one that is
 committed and flexible (\gv{}, 2.9 deterministic).
 

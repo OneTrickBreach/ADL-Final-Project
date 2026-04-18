@@ -63,10 +63,12 @@ games, so zombie spawn patterns are directly comparable.*
 
 **Three take-aways:**
 
-- **Monotonic learned progression G2 → G5.** Stochastic score climbs
-  1.80 → 4.10 → 7.40 → 11.20 (each primitive is additive). Deterministic tracks the
-  same shape (−1.90 → 0.60 → 0.20 → 2.90). **G5 is the peak**, and outperforms the
-  unrestricted heuristic ceiling G0 (11.20 vs 8.70).
+- **Strictly monotonic stochastic progression G2 → G5** (1.80 → 4.10 → 7.40 → 11.20;
+  each primitive is additive). The deterministic progression climbs from strongly
+  negative to strongly positive along the same sequence
+  (−1.90 → 0.60 → 0.20 → 2.90); G3 and G4 are tied within noise and **G5 is the
+  peak on both metrics**, outperforming the unrestricted heuristic ceiling G0
+  (8.70) by **+29%** on stochastic score.
 - **The failure signal is active.** Every game reports 1.8–3.0 failures/episode, so
   the failure penalty `−1.0 × failures_this_step` is a live training signal (not a
   vestigial term). G5 *minimises* failures (1.8) while *maximising* score — the
@@ -184,7 +186,31 @@ ADLProject2/
 
 ---
 
-## 8. Status
+## 8. Prior exploration (for context)
+
+An earlier iteration of this project (preserved on the `legacy` branch) ran a
+5-game ablation on the same KAZ environment but shaped cooperation through
+stacked reward penalties (ammo cost, stamina cost, fog-of-war, 60 / 40 team
+blend) rather than through structural primitives. Three shortcomings in that
+iteration motivated the redesign captured in this branch:
+
+- **No heuristic baselines.** Without G0 / G1a / G1b, there was no way to tell
+  whether a measured kill density was good or bad relative to a trivial
+  scripted policy.
+- **No live failure signal.** The environment never produced a zombie crossing
+  during evaluation, so the defence-penalty term in the reward was inert at
+  training time — a bug we later traced to the failure detector.
+- **Deterministic passivity.** Under penalty stacking the argmax policy
+  collapsed to near-zero activity even when the stochastic policy still fired,
+  which made the headline results hard to defend under strict evaluation.
+
+Every design choice in the current project (heuristic baselines, position-plus-breach
+failure detector, structural primitives with minimal shaping, identical
+per-episode seeds) is a direct response to one of those shortcomings.
+
+---
+
+## 9. Status
 
 | Milestone                                      | Status |
 |------------------------------------------------|--------|

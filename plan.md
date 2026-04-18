@@ -80,9 +80,11 @@ across every game, so zombie spawn patterns are directly comparable.
 
 **Three findings:**
 
-1. **Monotonic learned progression G2 → G5.** Stochastic 1.80 → 4.10 → 7.40 → 11.20;
-   deterministic −1.90 → 0.60 → 0.20 → 2.90. Peak is G5 on both metrics, and G5
-   beats the unrestricted heuristic ceiling (G0 = 8.70).
+1. **Strictly monotonic stochastic progression G2 → G5**
+   (1.80 → 4.10 → 7.40 → 11.20). Deterministic climbs from strongly negative to
+   strongly positive along the same sequence (−1.90 → 0.60 → 0.20 → 2.90); G3
+   and G4 are tied within noise. G5 is the peak on both metrics and beats the
+   unrestricted heuristic ceiling (G0 = 8.70) by +29 % on stochastic score.
 2. **Failure signal is live.** 1.8–3.0 failures/episode across the 7 games. G5
    achieves the lowest failure count (1.8) *and* the highest score, i.e. the
    pragmatic override earns its place in the curriculum by genuinely trading off

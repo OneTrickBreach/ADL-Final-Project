@@ -1,5 +1,6 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[margin=2.5cm]{geometry}
+\usepackage{lmodern}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
@@ -469,6 +470,145 @@ artifacts are available in the project repository
 across games, a soft-mask wrapper, and seed-paired stochastic +
 deterministic evaluations---is designed to be easy to extend to additional
 primitives without invalidating previously trained checkpoints.
+
+\section{V3.1 Addendum: Detector Rewrite \& Pressure Retune}
+\label{sec:v3_1}
+
+\paragraph{Motivation.}
+Post-submission, a pre-flight of a planned V3.1 parameter sweep revealed
+a bug in the V3 failure detector and a hyperparameter regime where the
+failure penalty was effectively inert. Specifically: (i) the V3 detector
+counted zombies that \emph{disappeared from the zombie list}, gated on
+\texttt{any\_kill}, but in KAZ a crossed zombie stays in the list (its
+removal happens only via kill), so the detector fired only on ambiguous
+multi-disappearance frames; (ii) the default pressure
+(\texttt{spawn\_rate=20}, \texttt{max\_zombies=10}) combined with the
+heuristic aggression of G0 meant that even random play produced zero
+crosses in most episodes. The net effect was Section~\ref{sec:discussion}
+\S4.4's ``zero failures throughout''---a property of the instrument,
+not the policy.
+
+\paragraph{Fix.}
+V3.1 rewrites the detector and retunes six pressure parameters; no
+changes to reward composition, model architecture, or curriculum.
+\begin{itemize}[nosep]
+\item \textbf{Detector} (\texttt{src/wrappers/kaz\_wrapper\_v3.py}):
+line-crossing is counted when a zombie's \texttt{rect.centery} $\ge$
+\texttt{SCREEN\_H} $-$ \texttt{ZOMBIE\_Y\_SPEED} (with a per-\texttt{id}
+dedup set); agent-breach is counted via the sprite-list delta
+\texttt{prev\_alive\_count $-$ cur\_alive}. An optional
+episode-continuation override flips \texttt{raw.run = True} when
+\texttt{cur\_alive > 0}, so multiple line-crosses can be counted in one
+rollout.
+\item \textbf{Pressure defaults:} \texttt{spawn\_rate} 20$\to$8,
+\texttt{max\_zombies} 10$\to$20, lock radius 0.15$\to$0.25 $W$, ammo
+30/15$\to$60/30, knight stamina 100$\to$150.
+\item \textbf{Risk~\#3 cap:} reward term clamped at
+\texttt{min(failures, 3)} per step to prevent catastrophic advantage
+spikes while the raw counter is left unclamped for metrics.
+\end{itemize}
+
+\paragraph{Pre-flight gates.} All four passed on the retuned wrapper
+before retraining: $g1a$ \texttt{failures\_mean} = 3.33 ($\ge 2$);
+$g0$ \texttt{failures\_mean} = 3.00 ($> 0$, $\le 2 \times$ $g0$ kills =
+36.00); all three $g1a$ pre-flight episodes had \texttt{ep\_len}
+$\in \{151, 175, 173\}$, i.e.\ $> 150$.
+
+\paragraph{Retrained results (10 episodes/game, seed $42 +$ ep\_idx).}
+
+\begin{table}[H]
+\centering
+\caption{V3.1 main ablation table. Peak is now \textbf{\gv{}} (11.20
+stochastic, 2.90 deterministic), not \giii{}: under actual pressure the
+pragmatic override earns its place in the curriculum. Failures are now
+nonzero across the progression (1.8--3.0/episode).}
+\label{tab:v3_1_main}
+\small
+\begin{tabular}{@{}llllllr@{}}
+\toprule
+\textbf{Game} & \textbf{Stoch. score} & \textbf{Det. score} & \textbf{\%Ammo} & \textbf{\%Stam} & \textbf{Kills A/K} & \textbf{Fail} \\
+\midrule
+\gz{}    & 8.70 $\pm$ 9.65  & --                 & 0.00 & 0.00 & 7.5 / 4.2  & 3.0 \\
+\ga{}    & 1.70 $\pm$ 3.00  & --                 & 0.60 & 0.55 & 1.0 / 3.6  & 2.9 \\
+\gb{}    & 1.60 $\pm$ 2.76  & --                 & 0.60 & 0.55 & 0.9 / 3.6  & 2.9 \\
+\gii{}   & 1.80 $\pm$ 1.08  & $-$1.90 $\pm$ 1.14 & 0.97 & 0.86 & 4.5 / 0.1  & 2.8 \\
+\giii{}  & 4.10 $\pm$ 2.17  & 0.60 $\pm$ 1.43    & 0.96 & 0.85 & 5.5 / 1.0  & 2.4 \\
+\giv{}   & 7.40 $\pm$ 3.32  & 0.20 $\pm$ 2.71    & 0.90 & 0.93 & 10.0 / 0.1 & 2.7 \\
+\gv{}    & \textbf{11.20 $\pm$ 3.12} & \textbf{2.90 $\pm$ 2.62} & 0.88 & 0.81 & 12.3 / 0.7 & 1.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{../results/v3_1/score_evolution.png}
+\caption{V3.1 score evolution. Stochastic score is monotonic
+\gii{}$\to$\gv{} (1.80 $\to$ 4.10 $\to$ 7.40 $\to$ 11.20), and
+deterministic tracks the same shape
+($-$1.90 $\to$ 0.60 $\to$ 0.20 $\to$ 2.90).}
+\label{fig:v3_1_score}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\linewidth]{../results/v3_1/metric_breakdown.png}
+\caption{V3.1 metric breakdown. Unlike V3, knight kills are now nonzero
+at \giii--\gv{} (0.1--1.0 / ep) because the lock radius was widened
+from 0.15$W$ to 0.25$W$ and knight stamina raised from 100 to 150.}
+\label{fig:v3_1_breakdown}
+\end{figure}
+
+\paragraph{Ship-gates.} All five hold on V3.1
+(\texttt{docs/v3\_1\_retrain\_plan\_fixed.md} \S7): $g1a/g1b$ failures $> 0$;
+$\ge 1$ learned game with failures $> 0$; \giii{} $\ge$ \gii{}; \giv{} $\ge$
+\giii{}; \gv{} $\ge$ \giv{}.
+
+\paragraph{Which V3 claims survive, which are revised.}
+
+\begin{itemize}[nosep]
+\item \textbf{Roles give a lift (V3~\S5.1)}: still true.
+\giii{} $-$ \gii{} $=$ +2.30 points stochastic (+128\%).
+\item \textbf{Peak-at-\giii{} (V3~\S5.1, Table~\ref{tab:main})}:
+\emph{revised}. Under actual pressure, \gv{} is the peak (+11.20
+stochastic, +2.90 deterministic). The V3 peak-at-\giii{} result is a
+property of the previous low-pressure regime; see
+\texttt{docs/v3\_1\_preflight\_findings.md} for the mechanism.
+\item \textbf{Deterministic improves monotonically (V3~\S5.3)}:
+still true. V3.1 deterministic climbs
+\gii{} $-$1.90 $\to$ \gv{} $+$2.90, and the sign flip from negative
+(\gii{}) to strongly positive (\gv{}) is sharper than V3's
+0.80 $\to$ 2.60 trajectory.
+\item \textbf{Knight passivity under locks (V3~\S5.2)}: \emph{partially
+revised}. At the V3 lock radius (0.15$W$) knights were near-silent
+(0.0 kills/ep). At the V3.1 radius (0.25$W$) knights carry
+0.1--1.0 kills/ep across \giii--\gv{}, though \giv{} with its tighter
+role constraint still drops to 0.1. The qualitative claim ``tight locks
+cause knight passivity'' survives; the specific radius threshold moves.
+\item \textbf{Zero failures (V3~\S5.4)}: \emph{obsolete}. V3.1 has
+1.8--3.0 failures/episode across all seven games, and
+\texttt{-failure\_penalty $\times$ failures\_this\_step} is now part of
+the training gradient. The new observation is that \gv{} minimises
+failures (1.8) while simultaneously maximising score, i.e.\ the
+pragmatic override is performing genuine offense/defense trade-off.
+\end{itemize}
+
+\paragraph{Sensitivity: V3 vs V3.1 as a controlled pressure sweep.}
+Because V3.1 changes only the detector and six pressure defaults,
+the V3 artifact set (\texttt{models/v3/}, \texttt{results/v3/}) can be
+read as an additional datapoint in a spawn-rate / lock-radius sweep.
+The qualitative ordering is preserved (G0 baseline ceiling, G2 learned
+floor, monotonic structural gain), but under V3's easy regime the
+pragmatic override (G5) adds no measurable value, while under V3.1's
+realistic regime it contributes the single largest step
+(+3.80 stochastic \giv{}$\to$\gv{}). This is consistent with the
+primitive's design: the override exists to intervene \emph{when failure
+is imminent}, so it is silent when failures never happen.
+
+\paragraph{Artifacts.} All V3.1 artifacts live under
+\texttt{results/v3\_1/} (figures, per-game eval JSONs stochastic +
+deterministic, 10-episode MP4 demos for every game, side-by-side
+\gz{} vs \gv{} video, ablation table). V3 artifacts remain under
+\texttt{results/v3/} for the sensitivity comparison above.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

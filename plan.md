@@ -1,11 +1,102 @@
 ## ADL Final Project — Roadmap
 
-Live ledger for all three iterations of this study. Most recent work is V3
-("Structured Teamwork"); V1 and V2 are preserved unchanged for reference.
+Live ledger for all iterations of this study. Most recent work is **V3.1**
+("Structured Teamwork Under Pressure"). V3 is preserved for the sensitivity
+appendix; V1 and V2 remain unchanged on their own branches.
 
 ---
 
-## V3 — Structured Teamwork (current)
+## V3.1 — Detector Rewrite + Pressure Retune (current)
+
+> Branch: `v3-overhaul` (continued) · Reference spec: `docs/v3_1_retrain_plan_fixed.md`
+> Supersedes V3 which had a backwards failure detector (see `docs/v3_1_preflight_findings.md`).
+
+**Thesis.** The V3 thesis (structure > reward magnitude) was right, but V3's
+numbers were measured under the wrong instrument: the failure detector
+double-counted kills as crosses and the default pressure was low enough that
+`failures_mean = 0` across all 7 games. V3.1 fixes both: a rewritten detector
+(line-cross on `centery` + agent-breach via sprite-list delta) and retuned
+pressure (spawn_rate 20→8, max_zombies 10→20, lock radius 0.15→0.25 W, ammo
+30/15→60/30, knight stamina 100→150).
+
+### Phase V3.1-1 — Pre-flight ✅
+
+Pre-flight gates all PASS (commit `0796b60`):
+* **A**: `g1a failures_mean ≥ 2` (3.33 observed)
+* **B**: `g0 failures_mean > 0` (3.00 observed)
+* **C**: `g0 failures_mean ≤ 2 × g0_kills_mean` (3.00 ≤ 36.00)
+* **D**: ≥1 g1a episode with `ep_len > 150` (all 3 test eps: 151 / 175 / 173)
+
+### Phase V3.1-2 — Implementation ✅ (commit `0796b60`)
+
+* `src/wrappers/kaz_wrapper_v3.py` — detector rewrite (line-cross + agent-breach),
+  tier-2 episode-continuation override, Risk #3 reward cap (`min(failures, 3)`),
+  six constructor defaults retuned per §3 of the fixed plan.
+* `src/train_v3.py` — `--output_suffix` CLI arg routes checkpoints to
+  `models/v3_1/` and TB logs to `results/tensorboard_v3_1/`.
+* `src/evaluate_v3.py` — `--results_dir` CLI arg for JSON + demo outputs,
+  `ammo_mode.txt` fallback first checks `--results_dir`, then `results/v3/`.
+* `src/phase_artifacts_v3.py` — `--results_dir`, `--output_dir`, `--models_dir`
+  CLI args so V3.1 figures live in `results/v3_1/`.
+* `scripts/mega_train_v3_1.sh` — V3.1 one-shot orchestration with
+  `--output_suffix _1 --results_dir results/v3_1`, transferring G2→G3→G4→G5
+  from `models/v3_1/...`.
+
+### Phase V3.1-3 — Training ✅
+
+~4 h on RTX 5070 Ti. Ammo mode auto-selected = **global** (g1a = g1b ≥-tiebreak).
+
+| Stage | Steps     | Arch            | Transferred     |
+|-------|-----------|-----------------|-----------------|
+| G2    | 1,000,000 | Attention       | scratch         |
+| G3    | 1,500,000 | Attention + GRU | 28 / 32 from G2 |
+| G4    | 1,500,000 | Attention + GRU | 32 / 32 from G3 |
+| G5    | 2,000,000 | Attention + GRU | 32 / 32 from G4 |
+
+### Phase V3.1-4 — Evaluation ✅ (commit `67a4234`)
+
+10 stochastic + 10 deterministic episodes per learned game; 10 stochastic per
+heuristic game; seed `42 + ep_idx`; demos recorded for **all 7 games**
+(10 eps × 7 games = 70 MP4s, using `--output_suffix record` so demo re-runs do
+not clobber canonical eval JSONs).
+
+| Game | Stochastic      | Deterministic  | Kills A/K  | Failures |
+|------|-----------------|----------------|------------|----------|
+| G0   | 8.70 ± 9.65     | —              | 7.5 / 4.2  | 3.0      |
+| G1a  | 1.70 ± 3.00     | —              | 1.0 / 3.6  | 2.9      |
+| G1b  | 1.60 ± 2.76     | —              | 0.9 / 3.6  | 2.9      |
+| G2   | 1.80 ± 1.08     | −1.90 ± 1.14   | 4.5 / 0.1  | 2.8      |
+| G3   | 4.10 ± 2.17     | 0.60 ± 1.43    | 5.5 / 1.0  | 2.4      |
+| G4   | 7.40 ± 3.32     | 0.20 ± 2.71    | 10.0 / 0.1 | 2.7      |
+| G5   | **11.20 ± 3.12**| **2.90 ± 2.62**| 12.3 / 0.7 | 1.8      |
+
+**Ship-gates** (all PASS): g1a/g1b failures > 0; ≥1 learned game with failures > 0;
+G3≥G2; G4≥G3; G5≥G4.
+
+**Three V3.1 findings:**
+1. **Monotonic G2→G5** (1.80 → 4.10 → 7.40 → 11.20). Peak is G5, not G3 as
+   in V3, because under actual pressure the pragmatic override pays off.
+2. **Failures are now nonzero** (1.8–3.0/ep), so the `-1.0 × failures`
+   reward term is part of the learning signal rather than a dead branch.
+   G5 minimises failures (1.8) while maximising score — genuine offense /
+   defense trade-off.
+3. **Knights rejoin the fight.** V3 G4/G5 produced 0.0 knight-kills/ep. V3.1
+   with wider lock radius (0.25W) and higher stamina (150) yields 0.1→1.0
+   knight-kills/ep across G3–G5.
+
+### Phase V3.1-5 — Documentation ✅ (commit C)
+
+* `README.md` rewrite (V3.1 as canonical, V3 as historical sensitivity baseline).
+* `docs/report.tex` appended with §7 V3.1 Addendum (new table, figures pointing
+  to `../results/v3_1/`, updated discussion).
+* `plan.md` this section.
+* V3 artifacts (`models/v3/`, `results/v3/`, `results/tensorboard_v3/`) remain
+  intact and are referenced from the addendum as a controlled low-pressure
+  point of comparison.
+
+---
+
+## V3 — Structured Teamwork (superseded by V3.1, preserved)
 
 > Branch: `v3-overhaul` · Reference spec: `docs/v3_implementation_plan.md`
 

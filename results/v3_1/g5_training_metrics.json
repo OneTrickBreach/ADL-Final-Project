@@ -1,0 +1,30 @@
+{
+  "game": "g5",
+  "arch": "attention_gru",
+  "total_timesteps": 2004018,
+  "episodes": 3037,
+  "mean_episode_return": 1.566384999999998,
+  "mean_episode_length": 189.46,
+  "last_episode_stats": {
+    "score": 11,
+    "kills_total": 12,
+    "kills_archer": 11,
+    "kills_knight": 1,
+    "attacks_archer": 46,
+    "attacks_knight": 17,
+    "failures": 1,
+    "episode_length": 151,
+    "ammo_pct_expended": 0.7666666666666667,
+    "ammo_pct_expended_per_archer": [
+      null,
+      null
+    ],
+    "stamina_pct_expended": 0.74,
+    "stamina_pct_expended_per_knight": [
+      0.8266666666666667,
+      0.6533333333333333
+    ],
+    "pragmatic_overrides": 0,
+    "ammo_mode": "global"
+  }
+}

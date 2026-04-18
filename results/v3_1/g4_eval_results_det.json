@@ -1,0 +1,264 @@
+{
+  "game": "g4",
+  "episodes": 10,
+  "seed": 42,
+  "deterministic": true,
+  "ammo_mode": "global",
+  "score_mean": 0.2,
+  "score_std": 2.7129319932501073,
+  "stamina_pct_expended_mean": 0.6239999999999999,
+  "stamina_pct_expended_per_knight": [
+    0.6520000000000001,
+    0.596
+  ],
+  "ammo_pct_expended_mean": 0.8,
+  "ammo_pct_expended_per_archer": [],
+  "kills_archer_mean": 3.8,
+  "kills_knight_mean": 0.0,
+  "attacks_archer_mean": 69.8,
+  "attacks_knight_mean": 27.7,
+  "failures_mean": 3.6,
+  "episode_length_mean": 161.7,
+  "per_episode": [
+    {
+      "score": -1,
+      "kills_total": 2,
+      "kills_archer": 2,
+      "kills_knight": 0,
+      "attacks_archer": 114,
+      "attacks_knight": 6,
+      "failures": 3,
+      "episode_length": 151,
+      "ammo_pct_expended": 1.0,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.51,
+      "stamina_pct_expended_per_knight": [
+        0.48,
+        0.54
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -2.617750000000002,
+      "seed": 42
+    },
+    {
+      "score": 0,
+      "kills_total": 4,
+      "kills_archer": 4,
+      "kills_knight": 0,
+      "attacks_archer": 114,
+      "attacks_knight": 58,
+      "failures": 4,
+      "episode_length": 167,
+      "ammo_pct_expended": 1.0,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.78,
+      "stamina_pct_expended_per_knight": [
+        0.8333333333333334,
+        0.7266666666666667
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -2.2262500000000007,
+      "seed": 43
+    },
+    {
+      "score": 0,
+      "kills_total": 4,
+      "kills_archer": 4,
+      "kills_knight": 0,
+      "attacks_archer": 79,
+      "attacks_knight": 38,
+      "failures": 4,
+      "episode_length": 167,
+      "ammo_pct_expended": 1.0,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.6799999999999999,
+      "stamina_pct_expended_per_knight": [
+        0.66,
+        0.7
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -1.9857500000000012,
+      "seed": 44
+    },
+    {
+      "score": 2,
+      "kills_total": 5,
+      "kills_archer": 5,
+      "kills_knight": 0,
+      "attacks_archer": 40,
+      "attacks_knight": 42,
+      "failures": 3,
+      "episode_length": 151,
+      "ammo_pct_expended": 0.6666666666666666,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.6233333333333333,
+      "stamina_pct_expended_per_knight": [
+        0.7066666666666667,
+        0.54
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -2.0970000000000013,
+      "seed": 45
+    },
+    {
+      "score": -2,
+      "kills_total": 2,
+      "kills_archer": 2,
+      "kills_knight": 0,
+      "attacks_archer": 7,
+      "attacks_knight": 32,
+      "failures": 4,
+      "episode_length": 151,
+      "ammo_pct_expended": 0.11666666666666667,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.5866666666666667,
+      "stamina_pct_expended_per_knight": [
+        0.5933333333333334,
+        0.58
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -1.9900000000000007,
+      "seed": 46
+    },
+    {
+      "score": -2,
+      "kills_total": 2,
+      "kills_archer": 2,
+      "kills_knight": 0,
+      "attacks_archer": 43,
+      "attacks_knight": 14,
+      "failures": 4,
+      "episode_length": 159,
+      "ammo_pct_expended": 0.7166666666666667,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.5266666666666666,
+      "stamina_pct_expended_per_knight": [
+        0.5733333333333334,
+        0.48
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -2.0710000000000024,
+      "seed": 47
+    },
+    {
+      "score": -2,
+      "kills_total": 2,
+      "kills_archer": 2,
+      "kills_knight": 0,
+      "attacks_archer": 95,
+      "attacks_knight": 2,
+      "failures": 4,
+      "episode_length": 130,
+      "ammo_pct_expended": 1.0,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.38,
+      "stamina_pct_expended_per_knight": [
+        0.38,
+        0.38
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -2.367500000000001,
+      "seed": 48
+    },
+    {
+      "score": 7,
+      "kills_total": 11,
+      "kills_archer": 11,
+      "kills_knight": 0,
+      "attacks_archer": 86,
+      "attacks_knight": 25,
+      "failures": 4,
+      "episode_length": 215,
+      "ammo_pct_expended": 1.0,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.9433333333333334,
+      "stamina_pct_expended_per_knight": [
+        0.9133333333333333,
+        0.9733333333333334
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -0.33125000000000127,
+      "seed": 49
+    },
+    {
+      "score": -2,
+      "kills_total": 2,
+      "kills_archer": 2,
+      "kills_knight": 0,
+      "attacks_archer": 90,
+      "attacks_knight": 42,
+      "failures": 4,
+      "episode_length": 167,
+      "ammo_pct_expended": 1.0,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.6033333333333333,
+      "stamina_pct_expended_per_knight": [
+        0.6666666666666666,
+        0.54
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -2.4522500000000007,
+      "seed": 50
+    },
+    {
+      "score": 2,
+      "kills_total": 4,
+      "kills_archer": 4,
+      "kills_knight": 0,
+      "attacks_archer": 30,
+      "attacks_knight": 18,
+      "failures": 2,
+      "episode_length": 159,
+      "ammo_pct_expended": 0.5,
+      "ammo_pct_expended_per_archer": [
+        null,
+        null
+      ],
+      "stamina_pct_expended": 0.6066666666666667,
+      "stamina_pct_expended_per_knight": [
+        0.7133333333333334,
+        0.5
+      ],
+      "pragmatic_overrides": 0,
+      "ammo_mode": "global",
+      "mean_return": -0.7822500000000026,
+      "seed": 51
+    }
+  ]
+}
